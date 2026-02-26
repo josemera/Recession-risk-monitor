@@ -166,7 +166,7 @@ body::before{
 .ind-card{
   background:var(--surface);border:1px solid var(--border);border-radius:5px;
   padding:14px 16px;position:relative;overflow:hidden;
-  transition:transform 0.15s, border-color 0.2s;cursor:default;
+  transition:transform 0.15s, border-color 0.2s;cursor:pointer;
   animation:fadeUp 0.5s ease both;
 }
 .ind-card:hover{transform:translateY(-3px);}
@@ -276,7 +276,23 @@ body::before{
   text-align:right;margin-top:4px;letter-spacing:0.5px;
 }
 
-/* ── EXPORT BUTTON ── */
+/* ── NEXT UPDATE row ── */
+.next-update{
+  font-size:7.5px;color:var(--text-muted);letter-spacing:0.3px;
+  margin-top:3px;padding-left:1px;opacity:0.75;
+}
+/* ── METHOD TABLE INFO ICON ── */
+.info-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:13px;height:13px;border-radius:50%;
+  border:1px solid var(--border2);color:var(--text-muted);
+  font-size:8px;font-style:italic;font-family:Georgia,serif;
+  cursor:pointer;margin-left:5px;vertical-align:middle;
+  transition:border-color 0.15s,color 0.15s;flex-shrink:0;
+  font-weight:700;line-height:1;
+}
+.info-icon:hover{border-color:var(--accent);color:var(--accent);}
+
 #exportBtn{padding:5px 12px;font-size:9px;}
 
 /* ── COMPOSITE TOOLTIP (?) ── */
@@ -370,10 +386,10 @@ body::before{
   position:fixed;background:#1a2840;border:1px solid var(--border2);
   border-radius:4px;padding:10px 14px;font-size:10px;
   pointer-events:none;opacity:0;transition:opacity 0.15s;
-  z-index:1000;max-width:240px;line-height:1.6;color:var(--text);
+  z-index:1000;max-width:320px;line-height:1.6;color:var(--text);
 }
 .tippy.on{opacity:1;}
-.tippy b{color:var(--text);display:block;margin-bottom:3px;}
+.tippy b{color:var(--text);display:block;margin-bottom:4px;font-size:10.5px;}
 .tippy span{color:var(--text-dim);}
 
 /* Responsive */
@@ -1021,6 +1037,121 @@ function computeComposite(inds) {
   return Math.round(total);
 }
 
+// ── Release schedule by indicator id ─────────────────────────────────
+const RELEASE_SCHEDULE = {
+  0:  () => nextTradingDay(),
+  1:  () => 'Weekly · ' + nextWeekday(5, 'Fri'),
+  2:  () => nextQuarterlyRelease([1,4,7,10], 7),
+  3:  () => 'Monthly · ' + nextMonthlyRelease('first-friday'),
+  4:  () => 'Monthly · ' + nextMonthlyRelease(22),
+  5:  () => 'Monthly · ' + nextMonthlyRelease(17),
+  6:  () => 'Monthly · ' + nextMonthlyRelease('last-friday'),
+  7:  () => nextQuarterlyRelease([3,6,9,12], 28),
+  8:  () => 'Monthly · ' + nextMonthlyRelease(17),
+  9:  () => 'Monthly · ' + nextMonthlyRelease(28),
+  10: () => nextTradingDay(),
+  11: () => 'Weekly · ' + nextWeekday(4, 'Thu'),
+};
+
+function nextTradingDay() {
+  const d = new Date();
+  const dow = d.getDay(); // 0=Sun,6=Sat
+  const skip = dow === 5 ? 3 : dow === 6 ? 2 : 1;
+  d.setDate(d.getDate() + skip);
+  return 'Next trading day · ' + d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function nextWeekday(targetDow, label) {
+  const d = new Date();
+  let diff = (targetDow - d.getDay() + 7) % 7 || 7;
+  d.setDate(d.getDate() + diff);
+  return label + ' ' + d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function nextMonthlyRelease(daySpec) {
+  const now = new Date();
+  for (let mo = 0; mo <= 2; mo++) {
+    const yr = now.getFullYear(), mn = now.getMonth() + mo;
+    let rd;
+    if      (daySpec === 'first-friday') rd = nthWeekdayOfMonth(yr, mn % 12, (mn >= 12 ? yr+1 : yr), 5, 1);
+    else if (daySpec === 'last-friday')  rd = lastWeekdayOfMonth(yr, mn % 12, (mn >= 12 ? yr+1 : yr), 5);
+    else { rd = new Date(yr, mn, daySpec); }
+    if (rd > now) return rd.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+  return 'Monthly';
+}
+function nextQuarterlyRelease(releaseMonths, dayOfMonth) {
+  const now = new Date();
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, dayOfMonth);
+    if (releaseMonths.includes(d.getMonth() + 1) && d > now)
+      return 'Quarterly · ~' + d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+  return 'Quarterly';
+}
+function nthWeekdayOfMonth(yr, mn, realYr, dow, n) {
+  const adjYr = mn > 11 ? realYr : yr;
+  const adjMn = mn % 12;
+  const d = new Date(adjYr, adjMn, 1);
+  let count = 0;
+  while (d.getMonth() === adjMn) {
+    if (d.getDay() === dow && ++count === n) return new Date(d);
+    d.setDate(d.getDate() + 1);
+  }
+  return new Date(adjYr, adjMn, 1);
+}
+function lastWeekdayOfMonth(yr, mn, realYr, dow) {
+  const adjYr = mn > 11 ? realYr : yr;
+  const adjMn = mn % 12;
+  const d = new Date(adjYr, adjMn + 1, 0);
+  while (d.getDay() !== dow) d.setDate(d.getDate() - 1);
+  return new Date(d);
+}
+
+// ── Embedded indicator descriptions ──────────────────────────────────
+const INDICATOR_DESCRIPTIONS = {
+  0:  `<b>Yield Curve — 10yr minus 3-month Spread</b><br>The spread between the 10-year Treasury yield and the 3-month T-bill rate. When short-term rates exceed long-term rates (an "inverted" yield curve), it signals that markets expect the Fed to cut rates due to an economic downturn. Has preceded every US recession since 1960 with a 6–18 month lead time — the single most reliable long-horizon indicator.`,
+  1:  `<b>Chicago Fed National Financial Conditions Index (NFCI)</b><br>Measures tightness or looseness of financial conditions across risk, credit, and leverage. A reading of 0 = average conditions; negative = looser than average (supportive of growth); positive = tighter (headwind to growth). Updated weekly back to 1971.`,
+  2:  `<b>Credit Conditions — Senior Loan Officer Survey</b><br>Net percentage of banks tightening lending standards for C&I loans, from the Fed's quarterly Senior Loan Officer Opinion Survey. When banks broadly tighten, credit becomes scarce and investment slows — a reliable leading indicator. Released quarterly with a ~2-month lag.`,
+  3:  `<b>Sahm Rule Real-Time Indicator</b><br>Triggers when the 3-month average unemployment rate rises 0.5 percentage points or more above its 12-month low. Developed by Claudia Sahm at the Federal Reserve. Has triggered in every recession since 1970 with zero false positives — the most reliable coincident recession indicator.`,
+  4:  `<b>CFNAI — Chicago Fed National Activity Index</b><br>A weighted average of 85 monthly economic indicators across production, employment, consumption, and sales. One of the primary tools the NBER Business Cycle Dating Committee uses when officially identifying recessions. A 3-month average below −0.70 is the standard recession threshold.`,
+  5:  `<b>Housing Permits — Year-over-Year Change</b><br>New residential building permits, year-over-year % change. Housing is the most rate-sensitive major sector and leads the business cycle — permit declines typically precede broader slowdowns by 6–12 months. Included as a standalone component in the Conference Board's LEI.`,
+  6:  `<b>Consumer Sentiment — UMich Z-Score</b><br>University of Michigan Consumer Sentiment Index expressed as a z-score vs the trailing 10-year average. Using a z-score normalises for structural level shifts over time. Sustained negative sentiment leads to reduced consumer spending, which drives ~70% of US GDP.`,
+  7:  `<b>Corporate Profits — NIPA Year-over-Year</b><br>Pre-tax corporate profits from the BEA National Income and Product Accounts, year-over-year change. Profit downturns precede layoffs and investment cuts, which feed into the broader economy. Back-to-back quarterly declines are a classic recession leading indicator. Released quarterly with ~1-month lag.`,
+  8:  `<b>Industrial Production — 6-Month Change</b><br>Federal Reserve index of US industrial output (manufacturing, mining, utilities), 6-month % change. A key NBER coincident indicator and one of the four series the committee weights most heavily when dating business cycle peaks and troughs.`,
+  9:  `<b>NY Fed Recession Probability Model</b><br>The New York Fed's model-based probability of the US economy being in recession 12 months ahead, derived from the yield curve spread. Converts the spread into a calibrated probability using a probit model estimated over the full post-war sample.`,
+  10: `<b>HY Credit Spread — ICE BofA High Yield OAS</b><br>Option-adjusted spread between US high yield bonds and Treasuries. A market-based measure of credit stress — when investors demand higher premiums to hold junk bonds, it signals deteriorating confidence in corporate creditworthiness. Updated daily. Widens sharply and reliably ahead of recessions.`,
+  11: `<b>Initial Jobless Claims — 4-Week Moving Average</b><br>Weekly initial unemployment insurance claims, smoothed to a 4-week average to reduce noise. One of the most timely leading indicators available — spikes before the unemployment rate rises, giving early warning of labour market deterioration. Released every Thursday by the Dept of Labor.`,
+};
+
+const FRED_URLS = {
+  0:  'https://fred.stlouisfed.org/graph/?g=1L5k',           // Yield curve 10y-3m spread
+  1:  'https://fred.stlouisfed.org/series/NFCI',
+  2:  'https://fred.stlouisfed.org/series/DRTSCILM',
+  3:  'https://fred.stlouisfed.org/series/SAHMREALTIME',
+  4:  'https://fred.stlouisfed.org/series/CFNAI',
+  5:  'https://fred.stlouisfed.org/series/PERMIT',
+  6:  'https://fred.stlouisfed.org/series/UMCSENT',
+  7:  'https://fred.stlouisfed.org/series/CP',
+  8:  'https://fred.stlouisfed.org/series/INDPRO',
+  9:  'https://fred.stlouisfed.org/series/RECPROUSM156N',
+  10: 'https://fred.stlouisfed.org/series/BAMLH0A0HYM2',
+  11: 'https://fred.stlouisfed.org/series/ICSA',
+};
+
+const METHOD_TABLE_DESCS = {
+  'Yield Curve (10y–3m)':       0,
+  'Financial Conditions (NFCI)':1,
+  'HY Credit Spread':           10,
+  'Credit Conditions':          2,
+  'Sahm Rule (Real-time)':      3,
+  'Jobless Claims (4wk avg)':   11,
+  'CFNAI (Chicago Fed Activity)':4,
+  'Housing Permits YoY':        5,
+  'Consumer Sentiment z-score': 6,
+  'Corporate Profits YoY':      7,
+  'Industrial Production 6mo':  8,
+  'Recession Probability':      9,
+};
+
 // ── Implied recession probability from composite score ──────────────
 // Logistic curve fitted to backtest: score 70→~8%, score 50→~35%, score 30→~75%
 function impliedRecProb(score) {
@@ -1197,7 +1328,7 @@ function renderIndicators(inds) {
 
     card.innerHTML = `
       <div class="ind-top">
-        <div class="ind-name">${ind.name}</div>
+        <div class="ind-name">${ind.name}${FRED_URLS[ind.id] ? ' <span style="opacity:0.4;font-size:7px;vertical-align:middle">↗</span>' : ''}</div>
         <div class="signal-dot ${ind.signal}"></div>
       </div>
       <div class="ind-value">${ind.value}</div>
@@ -1213,10 +1344,14 @@ function renderIndicators(inds) {
         <span class="freshness-dot ${ind.signal}"></span>
         ${fresh.label} · <span style="opacity:0.7">${sparkLabel}</span>
       </div>
+      <div class="next-update">↻ Next update: ${RELEASE_SCHEDULE[ind.id] ? RELEASE_SCHEDULE[ind.id]() : 'Monthly'}</div>
     `;
 
     card.addEventListener('mousemove', e => showTip(e, `${ind.name} (${ind.weight})`, ind.tip));
     card.addEventListener('mouseleave', hideTip);
+    if (FRED_URLS[ind.id]) {
+      card.addEventListener('click', () => window.open(FRED_URLS[ind.id], '_blank', 'noopener'));
+    }
 
     grid.appendChild(card);
   });
@@ -1475,7 +1610,24 @@ function renderHistoryChart(composite, usrec = [], historicalScores = []) {
   });
 })();
 
-// ── Drag-to-scroll on the chart ──────────────────────────────────────
+// ── Inject info icons into methodology table ─────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.method-table tbody tr').forEach(row => {
+    const nameCell = row.querySelector('td:first-child');
+    if (!nameCell) return;
+    const name = nameCell.textContent.trim();
+    const descId = METHOD_TABLE_DESCS[name];
+    if (descId === undefined) return;
+    const icon = document.createElement('span');
+    icon.className = 'info-icon';
+    icon.textContent = 'i';
+    icon.addEventListener('mousemove', e => {
+      showTip(e, '', INDICATOR_DESCRIPTIONS[descId], true);
+    });
+    icon.addEventListener('mouseleave', hideTip);
+    nameCell.appendChild(icon);
+  });
+});
 (function initChartDrag() {
   let isDown = false, startX = 0, scrollLeft = 0;
   document.addEventListener('DOMContentLoaded', () => {
@@ -1500,10 +1652,11 @@ function renderHistoryChart(composite, usrec = [], historicalScores = []) {
 //  TOOLTIP
 // ═══════════════════════════════════════════
 const tipEl = document.getElementById('tippy');
-function showTip(e, title, body) {
-  tipEl.innerHTML = `<b>${title}</b><span>${body.replace(/\n/g,'<br>')}</span>`;
+function showTip(e, title, body, isHtml = false) {
+  const bodyHtml = isHtml ? body : body.replace(/\n/g,'<br>');
+  tipEl.innerHTML = `<b>${title}</b><span>${bodyHtml}</span>`;
   tipEl.style.left = (e.clientX + 16) + 'px';
-  tipEl.style.top = (e.clientY - 8) + 'px';
+  tipEl.style.top  = (e.clientY - 8) + 'px';
   tipEl.classList.add('on');
 }
 function hideTip() { tipEl.classList.remove('on'); }
