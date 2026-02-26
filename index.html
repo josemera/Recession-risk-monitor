@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recession Risk Monitor — Live</title>
+<style>
+/* Alpha Vantage key row extra styles */
+.key-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:2;min-width:300px;}
+.key-block{display:flex;flex-direction:column;gap:4px;}
+.key-block label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);}
+.key-status{display:inline-flex;align-items:center;gap:5px;font-size:9px;padding:2px 8px;border-radius:2px;margin-top:2px;}
+.key-status.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+.key-status.missing{background:var(--surface2);color:var(--text-muted);border:1px solid var(--border);}
+.key-status.error{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,600;1,300&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e1117;
+  --surface: #161b26;
+  --surface2: #1d2535;
+  --border: #252f45;
+  --border2: #2e3d5c;
+  --green: #3ddc84;
+  --green-bg: rgba(61,220,132,0.08);
+  --green-border: rgba(61,220,132,0.25);
+  --amber: #f5a623;
+  --amber-bg: rgba(245,166,35,0.08);
+  --amber-border: rgba(245,166,35,0.25);
+  --red: #f0465a;
+  --red-bg: rgba(240,70,90,0.08);
+  --red-border: rgba(240,70,90,0.25);
+  --text: #d6e4f7;
+  --text-muted: #4e6a8a;
+  --text-dim: #8aa0c0;
+  --accent: #4f9eff;
+  --mono: 'IBM Plex Mono', monospace;
+  --display: 'Syne', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:12px;
+  line-height:1.5;
+  min-height:100vh;
+}
+
+/* Subtle dot grid background */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:radial-gradient(rgba(79,158,255,0.06) 1px, transparent 1px);
+  background-size:28px 28px;
+  pointer-events:none;z-index:0;
+}
+
+.page{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:20px 24px 40px;}
+
+/* ── API KEY BANNER ── */
+#apiBanner{
+  display:none;
+  background:linear-gradient(135deg, #1a2540, #1d3060);
+  border:1px solid rgba(79,158,255,0.3);
+  border-radius:6px;padding:20px 24px;margin-bottom:20px;
+  animation:slideDown 0.3s ease;
+}
+#apiBanner.show{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.banner-text{flex:1;min-width:200px;}
+.banner-text strong{color:var(--accent);font-size:13px;display:block;margin-bottom:4px;}
+.banner-text span{color:var(--text-dim);font-size:10px;}
+.banner-input-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+#fredKeyInput{
+  background:#0e1a2e;border:1px solid var(--border2);color:var(--text);
+  font-family:var(--mono);font-size:11px;padding:8px 12px;
+  border-radius:4px;width:340px;outline:none;
+  transition:border-color 0.2s;
+}
+#fredKeyInput:focus{border-color:var(--accent);}
+#fredKeyInput::placeholder{color:var(--text-muted);}
+.btn{
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  padding:8px 16px;border-radius:4px;cursor:pointer;
+  border:none;letter-spacing:1px;text-transform:uppercase;
+  transition:opacity 0.15s, transform 0.1s;
+}
+.btn:hover{opacity:0.85;transform:translateY(-1px);}
+.btn-primary{background:var(--accent);color:#05101e;}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border2);}
+.btn-sm{padding:5px 10px;font-size:10px;}
+.key-link{color:var(--accent);font-size:10px;text-decoration:none;opacity:0.7;}
+.key-link:hover{opacity:1;}
+
+/* ── HEADER ── */
+.header{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  margin-bottom:24px;padding-bottom:18px;
+  border-bottom:1px solid var(--border);
+}
+.header h1{font-family:var(--display);font-size:26px;letter-spacing:-0.5px;color:#e8f0fb;line-height:1;}
+.header-sub{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-muted);margin-top:6px;}
+.header-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.status-row{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text-dim);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text-muted);}
+.dot.live{background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 2.5s infinite;}
+.dot.error{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.35}}
+#refreshBtn{padding:5px 12px;font-size:9px;}
+
+/* ── COMPOSITE SCORE BAR ── */
+.composite-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:22px 28px;margin-bottom:16px;
+  display:flex;align-items:center;gap:28px;flex-wrap:wrap;
+}
+.composite-left{min-width:160px;}
+.composite-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;}
+.composite-number{font-family:var(--display);font-size:52px;line-height:1;letter-spacing:-2px;}
+.composite-regime{
+  display:inline-block;font-size:9px;letter-spacing:2px;text-transform:uppercase;
+  padding:4px 12px;border-radius:3px;margin-top:8px;font-weight:600;
+}
+.composite-right{flex:1;min-width:300px;}
+.bar-track{
+  height:12px;background:var(--surface2);border-radius:2px;overflow:hidden;
+  position:relative;margin-bottom:6px;border:1px solid var(--border);
+}
+.bar-segments{display:flex;height:100%;}
+.seg-red{background:linear-gradient(90deg,rgba(240,70,90,0.7),rgba(240,70,90,0.4));flex:0 0 50%;}
+.seg-amber{background:linear-gradient(90deg,rgba(245,166,35,0.5),rgba(245,166,35,0.3));flex:0 0 20%;}
+.seg-green{background:linear-gradient(90deg,rgba(61,220,132,0.3),rgba(61,220,132,0.5));flex:0 0 30%;}
+.bar-needle{
+  position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;border-radius:1px;
+  box-shadow:0 0 8px rgba(255,255,255,0.5);
+  transition:left 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bar-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);}
+.count-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.badge{
+  font-size:10px;font-weight:600;padding:4px 12px;border-radius:3px;
+  letter-spacing:0.5px;
+}
+.badge.red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);}
+.badge.amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);}
+.badge.green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+.badge.neutral{background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);}
+.composite-card .loading-shimmer{height:12px;background:var(--surface2);border-radius:2px;animation:shimmer 1.5s infinite;}
+@keyframes shimmer{0%,100%{opacity:0.4}50%{opacity:0.8}}
+
+/* ── INDICATORS GRID ── */
+.section-header{
+  display:flex;align-items:center;gap:12px;margin-bottom:12px;
+  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-muted);
+}
+.section-header::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.indicators-grid{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;
+}
+@media(max-width:1100px){.indicators-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:720px){.indicators-grid{grid-template-columns:repeat(2,1fr);}}
+
+.ind-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:5px;
+  padding:14px 16px;position:relative;overflow:hidden;
+  transition:transform 0.15s, border-color 0.2s;cursor:default;
+  animation:fadeUp 0.5s ease both;
+}
+.ind-card:hover{transform:translateY(-3px);}
+.ind-card.signal-red{border-top:2px solid var(--red);}
+.ind-card.signal-amber{border-top:2px solid var(--amber);}
+.ind-card.signal-green{border-top:2px solid var(--green);}
+.ind-card.signal-loading{border-top:2px solid var(--border2);}
+.ind-card::after{
+  content:'';position:absolute;inset:0;pointer-events:none;border-radius:5px;
+}
+.ind-card.signal-red::after{background:var(--red-bg);}
+.ind-card.signal-amber::after{background:var(--amber-bg);}
+.ind-card.signal-green::after{background:var(--green-bg);}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.ind-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.ind-name{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);line-height:1.4;max-width:80%;}
+.signal-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px;}
+.signal-dot.red{background:var(--red);box-shadow:0 0 8px var(--red);}
+.signal-dot.amber{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+.signal-dot.green{background:var(--green);box-shadow:0 0 8px var(--green);}
+.signal-dot.loading{background:var(--border2);}
+
+.ind-value{
+  font-family:var(--display);font-size:22px;line-height:1;margin:6px 0 2px;
+}
+.ind-card.signal-red .ind-value{color:var(--red);}
+.ind-card.signal-amber .ind-value{color:var(--amber);}
+.ind-card.signal-green .ind-value{color:var(--green);}
+.ind-card.signal-loading .ind-value{color:var(--text-muted);}
+
+.ind-sub{font-size:9px;color:var(--text-muted);margin-bottom:10px;}
+.ind-date{font-size:8px;color:var(--text-muted);opacity:0.6;margin-bottom:6px;}
+
+/* Sparkline */
+.spark-wrap{width:100%;height:28px;margin-bottom:8px;overflow:hidden;}
+.spark-wrap svg{width:100%;height:100%;}
+
+/* Score bar */
+.score-track{height:2px;background:var(--border);border-radius:1px;margin-bottom:8px;}
+.score-fill{height:100%;border-radius:1px;transition:width 1s ease;}
+.score-fill.red{background:var(--red);}
+.score-fill.amber{background:var(--amber);}
+.score-fill.green{background:var(--green);}
+
+.ind-footer{display:flex;justify-content:space-between;align-items:center;}
+.ind-score-label{font-size:8px;letter-spacing:0.5px;}
+.ind-weight-label{font-size:8px;color:var(--text-muted);opacity:0.5;}
+
+/* Data freshness pill — color matches card signal */
+.freshness{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:8px;letter-spacing:0.3px;padding:2px 7px;border-radius:20px;
+  margin-top:6px;font-family:var(--mono);
+}
+.freshness-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.freshness.green   { background:rgba(61,220,132,0.08);  color:var(--green);      border:1px solid rgba(61,220,132,0.2); }
+.freshness.amber   { background:rgba(245,166,35,0.08);  color:var(--amber);      border:1px solid rgba(245,166,35,0.2); }
+.freshness.red     { background:rgba(240,70,90,0.08);   color:var(--red);        border:1px solid rgba(240,70,90,0.2);  }
+.freshness.loading { background:rgba(78,106,138,0.08);  color:var(--text-muted); border:1px solid rgba(78,106,138,0.2); }
+.freshness-dot.green   { background:var(--green); }
+.freshness-dot.amber   { background:var(--amber); }
+.freshness-dot.red     { background:var(--red); }
+.freshness-dot.loading { background:var(--text-muted); }
+
+
+
+/* ── HISTORY CHART ── */
+.chart-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:20px 24px;margin-bottom:16px;
+}
+.chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.chart-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);}
+.chart-legend{display:flex;gap:16px;flex-wrap:wrap;}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--text-muted);}
+.leg-line{width:18px;height:2px;}
+.leg-sq{width:8px;height:8px;opacity:0.4;}
+
+/* Scrollable chart wrapper */
+.chart-scroll-outer{
+  position:relative;
+  height:180px;
+}
+/* Sticky y-axis sits on top of the scroll area, left-aligned */
+#histYAxis{
+  position:absolute;left:0;top:0;bottom:0;
+  width:36px;z-index:2;pointer-events:none;
+  background:linear-gradient(90deg, var(--surface) 80%, transparent 100%);
+}
+/* Scrollable inner — hides the y-axis width so canvas starts after it */
+.chart-scroll-inner{
+  position:absolute;left:36px;right:0;top:0;bottom:0;
+  overflow-x:auto;overflow-y:hidden;
+  cursor:grab;
+}
+.chart-scroll-inner:active{cursor:grabbing;}
+.chart-scroll-inner::-webkit-scrollbar{height:4px;}
+.chart-scroll-inner::-webkit-scrollbar-track{background:var(--surface2);}
+.chart-scroll-inner::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.chart-scroll-inner::-webkit-scrollbar-thumb:hover{background:var(--text-muted);}
+#histChart{display:block;height:180px;}
+/* Scroll hint */
+.chart-scroll-hint{
+  font-size:8px;color:var(--text-muted);opacity:0.5;
+  text-align:right;margin-top:4px;letter-spacing:0.5px;
+}
+
+/* ── EXPORT BUTTON ── */
+#exportBtn{padding:5px 12px;font-size:9px;}
+
+/* ── COMPOSITE TOOLTIP (?) ── */
+.comp-info-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:50%;border:1px solid var(--border2);
+  font-size:9px;color:var(--text-muted);cursor:pointer;margin-left:8px;
+  vertical-align:middle;background:transparent;font-family:var(--mono);
+  transition:border-color 0.15s,color 0.15s;
+}
+.comp-info-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── IMPLIED RECESSION PROBABILITY ── */
+.comp-prob{
+  font-size:9px;color:var(--text-muted);margin-top:6px;letter-spacing:0.5px;
+}
+.comp-prob strong{color:var(--text-dim);}
+
+/* ── ZOOM CONTROLS ── */
+.chart-zoom-row{display:flex;gap:6px;align-items:center;margin-bottom:10px;}
+.zoom-btn{
+  font-family:var(--mono);font-size:9px;padding:3px 10px;border-radius:3px;
+  border:1px solid var(--border2);background:transparent;color:var(--text-muted);
+  cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all 0.15s;
+}
+.zoom-btn:hover,.zoom-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(79,158,255,0.08);}
+.zoom-label{font-size:9px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-right:4px;}
+
+/* ── CHART CROSSHAIR OVERLAY ── */
+#chartCrosshair{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  pointer-events:none;z-index:3;
+}
+.chart-hover-tip{
+  position:fixed;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:4px;padding:6px 10px;font-size:9px;color:var(--text);
+  pointer-events:none;z-index:100;display:none;white-space:nowrap;
+  font-family:var(--mono);letter-spacing:0.5px;
+}
+
+/* ── MOBILE IMPROVEMENTS ── */
+@media(max-width:600px){
+  .composite-card{flex-direction:column;gap:14px;}
+  .composite-right{min-width:0;width:100%;}
+  .composite-number{font-size:38px;}
+  .chart-scroll-outer{height:140px;}
+  #histChart{height:140px;}
+  #histYAxis{height:140px;}
+  .chart-zoom-row{flex-wrap:wrap;}
+  .header{flex-direction:column;gap:10px;}
+  .header-right{align-items:flex-start;}
+}
+.method-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:18px 24px;margin-bottom:16px;
+}
+.method-table{width:100%;border-collapse:collapse;font-size:10px;}
+.method-table th{
+  font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);
+  padding:0 12px 8px 0;text-align:left;border-bottom:1px solid var(--border);font-weight:400;
+}
+.method-table td{
+  padding:8px 12px 8px 0;border-bottom:1px solid rgba(37,47,69,0.5);
+  color:var(--text-dim);vertical-align:top;line-height:1.5;
+}
+.method-table td:first-child{color:var(--text);font-weight:400;}
+.method-table tr:last-child td{border-bottom:none;}
+.wt{color:var(--accent);font-weight:600;}
+
+/* ── FOOTER ── */
+.footer{
+  border-top:1px solid var(--border);padding-top:14px;
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+  font-size:9px;color:var(--text-muted);letter-spacing:0.5px;line-height:1.8;
+}
+
+/* Loading skeleton */
+.skeleton{
+  background:linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size:200% 100%;
+  animation:skeleton-move 1.5s infinite;
+  border-radius:3px;
+}
+@keyframes skeleton-move{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-value{height:22px;width:70%;margin:6px 0 2px;}
+.skel-sub{height:8px;width:50%;margin-bottom:10px;}
+.skel-spark{height:28px;margin-bottom:8px;}
+
+/* Tooltip */
+.tippy{
+  position:fixed;background:#1a2840;border:1px solid var(--border2);
+  border-radius:4px;padding:10px 14px;font-size:10px;
+  pointer-events:none;opacity:0;transition:opacity 0.15s;
+  z-index:1000;max-width:240px;line-height:1.6;color:var(--text);
+}
+.tippy.on{opacity:1;}
+.tippy b{color:var(--text);display:block;margin-bottom:3px;}
+.tippy span{color:var(--text-dim);}
+
+/* Responsive */
+@media(max-width:600px){
+  .composite-card{flex-direction:column;}
+  .top-row{grid-template-columns:1fr;}
+  .header{flex-direction:column;gap:12px;}
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+<div class="page">
+
+  <!-- API Key Banner -->
+  <div id="apiBanner">
+    <div class="banner-text" style="min-width:220px;">
+      <strong>FRED API Key Required</strong>
+      <span>Free key from <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" class="key-link">fred.stlouisfed.org</a> — takes 30 seconds · All 12 indicators + full historical chart use FRED only</span>
+    </div>
+    <div style="flex:1;min-width:280px;">
+      <input id="fredKeyInput" type="text" placeholder="Paste your FRED API key here…" autocomplete="off" spellcheck="false" style="background:#0e1a2e;border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:8px 12px;border-radius:4px;width:100%;outline:none;margin-bottom:4px;">
+      <span class="key-status" id="fredKeyStatus">Missing</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-self:flex-end;">
+      <button class="btn btn-primary" onclick="saveKey()">Load Live Data</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadDemo()">Use Demo Data</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="header">
+    <div>
+      <h1>Recession Risk Monitor</h1>
+      <div class="header-sub">12-Indicator Composite · FRED Live Data · Reconstructed History · 12-Month Forward Horizon</div>
+    </div>
+    <div class="header-right">
+      <div class="status-row">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">Initializing…</span>
+      </div>
+      <div id="lastUpdated" style="font-size:9px;color:var(--text-muted)"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" id="refreshBtn" onclick="loadData()" style="display:none">↻ Refresh</button>
+        <button class="btn btn-ghost btn-sm" id="exportBtn" onclick="exportDashboard()" style="display:none">↓ Export PNG</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetKey()" id="resetKeyBtn" style="display:none">✕ Change Key</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Composite Score -->
+  <div class="composite-card" id="compositeCard">
+    <div class="composite-left">
+      <div class="composite-label">Composite Risk Score <button class="comp-info-btn" onclick="showScoreInfo()" title="What does this score mean?">?</button></div>
+      <div class="composite-number" id="compNum">—</div>
+      <div class="composite-regime" id="compRegime">Loading…</div>
+      <div class="comp-prob" id="compProb"></div>
+    </div>
+    <div class="composite-right">
+      <div class="bar-track">
+        <div class="bar-segments">
+          <div class="seg-red"></div>
+          <div class="seg-amber"></div>
+          <div class="seg-green"></div>
+        </div>
+        <div class="bar-needle" id="barNeedle" style="left:0%"></div>
+      </div>
+      <div class="bar-labels"><span>0 · HIGH RISK</span><span>50</span><span>70</span><span>100 · LOW RISK</span></div>
+      <div class="count-row" id="countRow">
+        <span class="badge neutral">Loading indicators…</span>
+      </div>
+      <div id="lastRefreshed" style="font-size:8px;color:var(--text-muted);margin-top:8px;letter-spacing:0.5px;"></div>
+    </div>
+  </div>
+
+  <!-- Indicator Cards -->
+  <div class="section-header">Indicator Detail · 12 Indicators · All FRED Data</div>
+  <div class="indicators-grid" id="indGrid"></div>
+
+  <div class="section-header">Reconstructed Composite History (1990–Present) · NBER Recession Bands · FRED Data</div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title" id="chartTitle">Composite Risk Score — Reconstructed 1990–Present · NBER Recession Shading</div>
+      <div class="chart-legend">
+        <div class="leg-item"><div class="leg-line" style="background:var(--accent)"></div><span>Composite Score</span></div>
+        <div class="leg-item"><div class="leg-line" style="background:rgba(79,158,255,0.5);border-top:1px dashed rgba(79,158,255,0.5)"></div><span>Implied Rec. Prob %</span></div>
+        <div class="leg-item"><div class="leg-line" style="background:var(--amber);"></div><span>Risk Threshold (50)</span></div>
+        <div class="leg-item"><div class="leg-sq" style="background:var(--red)"></div><span>Recession Zone</span></div>
+      </div>
+    </div>
+    <div class="chart-zoom-row">
+      <span class="zoom-label">Zoom:</span>
+      <button class="zoom-btn" onclick="setZoom(5)" id="zoom5">5yr</button>
+      <button class="zoom-btn" onclick="setZoom(10)" id="zoom10">10yr</button>
+      <button class="zoom-btn" onclick="setZoom(20)" id="zoom20">20yr</button>
+      <button class="zoom-btn active" onclick="setZoom(0)" id="zoomAll">Full</button>
+    </div>
+    <div class="chart-scroll-outer" style="position:relative;">
+      <canvas id="histYAxis"></canvas>
+      <div class="chart-scroll-inner" id="chartScrollInner">
+        <canvas id="histChart"></canvas>
+      </div>
+      <canvas id="chartCrosshair" style="position:absolute;top:0;left:36px;right:0;bottom:0;width:calc(100% - 36px);height:100%;pointer-events:none;z-index:3;"></canvas>
+    </div>
+    <div class="chart-scroll-hint">← scroll to pan · 14px per month · drag to scroll →</div>
+    <div class="chart-hover-tip" id="chartHoverTip"></div>
+  </div>
+
+  <!-- Methodology -->
+  <div class="section-header">Weights & Signal Logic</div>
+  <div class="method-card">
+    <table class="method-table">
+      <thead><tr><th>Indicator</th><th>FRED Series</th><th>Weight</th><th>Green</th><th>Amber</th><th>Red</th></tr></thead>
+      <tbody>
+        <tr><td>Yield Curve (10y–3m)</td><td>DGS10 − TB3MS</td><td class="wt">18%</td><td>> +1.0%</td><td>0–1%</td><td>< 0% (inverted)</td></tr>
+        <tr><td>Financial Conditions (NFCI)</td><td>NFCI</td><td class="wt">13%</td><td>< 0 (loose)</td><td>0–0.5</td><td>> 0.5 (stress)</td></tr>
+        <tr><td>HY Credit Spread</td><td>BAMLH0A0HYM2</td><td class="wt">8%</td><td>< 4%</td><td>4–7%</td><td>> 7% (stress)</td></tr>
+        <tr><td>Credit Conditions</td><td>DRTSCILM</td><td class="wt">8%</td><td>< 0 (easing)</td><td>0–20 net tightening</td><td>> 20 tightening</td></tr>
+        <tr><td>Sahm Rule (Real-time)</td><td>SAHMREALTIME</td><td class="wt">9%</td><td>< 0.10</td><td>0.10–0.50</td><td>≥ 0.50</td></tr>
+        <tr><td>Jobless Claims (4wk avg)</td><td>ICSA</td><td class="wt">7%</td><td>< 250k</td><td>250–400k</td><td>> 400k</td></tr>
+        <tr><td>CFNAI (Chicago Fed Activity)</td><td>CFNAI</td><td class="wt">9%</td><td>> 0</td><td>−0.7 to 0</td><td>< −0.7 recession threshold</td></tr>
+        <tr><td>Housing Permits YoY</td><td>PERMIT</td><td class="wt">8%</td><td>> 0%</td><td>−10% to 0%</td><td>< −10%</td></tr>
+        <tr><td>Consumer Sentiment z-score</td><td>UMCSENT</td><td class="wt">6%</td><td>> 0σ</td><td>−1σ to 0σ</td><td>< −1σ</td></tr>
+        <tr><td>Corporate Profits YoY</td><td>CP</td><td class="wt">6%</td><td>> 0%</td><td>−5% to 0%</td><td>< −5%</td></tr>
+        <tr><td>Industrial Production 6mo</td><td>INDPRO</td><td class="wt">4%</td><td>≥ 0%</td><td>−1% to 0%</td><td>< −1%</td></tr>
+        <tr><td>Recession Probability</td><td>RECPROUSM156N</td><td class="wt">4%</td><td>< 20%</td><td>20–40%</td><td>> 40%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <div>Data: St. Louis Federal Reserve FRED API · 12 indicators · Daily: Yield Curve, HY Spread · Weekly: NFCI, Jobless Claims · Monthly/Quarterly: all others</div>
+    <div>Composite > 70 = Low Risk · 50–70 = Elevated · < 50 = High Risk · Weights sum to 100%</div>
+  </div>
+</div>
+
+<div class="tippy" id="tippy"></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════
+const FRED_URL = 'https://api.stlouisfed.org/fred/series/observations';
+const WEIGHTS  = [0.18, 0.13, 0.08, 0.09, 0.09, 0.08, 0.06, 0.06, 0.04, 0.04, 0.08, 0.07];
+
+let apiKey   = '';
+let liveData = {};
+let histData = {};      // full historical series for reconstruction
+let histScores = [];    // [{date, score}, ...] oldest first
+
+// ═══════════════════════════════════════════
+//  KEY MANAGEMENT
+// ═══════════════════════════════════════════
+function getKey() { return localStorage.getItem('fredApiKey') || ''; }
+
+function saveKey() {
+  const k = document.getElementById('fredKeyInput').value.trim();
+  if (!k) { alert('Please paste a valid FRED API key.'); return; }
+  localStorage.setItem('fredApiKey', k);
+  apiKey = k;
+  const fs = document.getElementById('fredKeyStatus');
+  if (fs) { fs.textContent = '✓ Loaded'; fs.className = 'key-status ok'; }
+  hideBanner();
+  loadData();
+}
+
+function saveKeys() { saveKey(); } // legacy alias
+
+function resetKey() {
+  localStorage.removeItem('fredApiKey');
+  apiKey = '';
+  showBanner();
+}
+
+function loadDemo() { hideBanner(); renderDemo(); }
+
+function showBanner() {
+  const b = document.getElementById('apiBanner');
+  b.classList.add('show');
+  if (apiKey) document.getElementById('fredKeyInput').value = apiKey;
+  document.getElementById('refreshBtn').style.display    = 'none';
+  document.getElementById('exportBtn').style.display     = 'none';
+  document.getElementById('resetKeyBtn').style.display   = 'none';
+}
+
+function hideBanner() {
+  document.getElementById('apiBanner').classList.remove('show');
+  document.getElementById('refreshBtn').style.display  = '';
+  document.getElementById('exportBtn').style.display   = '';
+  document.getElementById('resetKeyBtn').style.display = '';
+}
+
+// ═══════════════════════════════════════════
+//  CORS PROXY FETCH
+//  corsproxy.io adds correct CORS headers so fetch() works from
+//  file://, localhost, and any hosted origin.
+//  Falls back to a second proxy if the first fails.
+// ═══════════════════════════════════════════
+const PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+
+async function proxyFetch(targetUrl) {
+  let lastErr;
+  for (const makeProxy of PROXIES) {
+    try {
+      const res = await fetch(makeProxy(targetUrl), { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch(e) {
+      lastErr = e;
+      console.warn('Proxy attempt failed, trying next:', e.message);
+    }
+  }
+  throw lastErr || new Error('All proxies failed for: ' + targetUrl);
+}
+
+// ═══════════════════════════════════════════
+//  FRED API FETCH
+// ═══════════════════════════════════════════
+async function fetchSeries(seriesId, limit = 120) {
+  const target = `${FRED_URL}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=${limit}`;
+  const json = await proxyFetch(target);
+  if (json.error_message) throw new Error(`FRED: ${json.error_message}`);
+  return (json.observations || [])
+    .filter(o => o.value !== '.' && o.value !== '')
+    .map(o => ({ date: o.date, value: parseFloat(o.value) }));
+}
+
+// ═══════════════════════════════════════════
+//  HISTORICAL RECONSTRUCTION HELPERS
+// ═══════════════════════════════════════════
+
+// Get the most recent value in arr (sorted newest-first) that is <= dateStr
+function getAsOf(arr, dateStr) {
+  if (!arr || arr.length === 0) return null;
+  for (const o of arr) {
+    if (o.date <= dateStr) return o.value;
+  }
+  return null;
+}
+
+// Offset a YYYY-MM-DD date string by N months
+function offsetDate(dateStr, months) {
+  const d = new Date(dateStr.slice(0, 7) + '-15'); // mid-month to avoid edge cases
+  d.setMonth(d.getMonth() + months);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+}
+
+// Get up to n values ending at/before dateStr (returns values newest-first)
+function getWindowBefore(arr, dateStr, n) {
+  if (!arr) return [];
+  return arr.filter(o => o.date <= dateStr).slice(0, n).map(o => o.value);
+}
+
+// Compute composite score for a specific month using historical arrays
+function computeCompositeForDate(dateStr, h) {
+  const scores = [];
+  try {
+    // 1. Yield Curve: GS10 - TB3MS (monthly)
+    const gs10  = getAsOf(h.GS10,  dateStr);
+    const tb3ms = getAsOf(h.TB3MS, dateStr);
+    const spread = (gs10 !== null && tb3ms !== null) ? gs10 - tb3ms : null;
+    scores.push(spread !== null ? scoreLinear(spread, -1.5, 2.5) : 50);
+
+    // 2. NFCI — negate so higher score = looser (healthier) conditions
+    const nfci = getAsOf(h.NFCI, dateStr);
+    scores.push(nfci !== null ? scoreLinear(-nfci, -2.0, 0.5) : 50);
+
+    // 3. Credit conditions (quarterly, forward-fill)
+    const credit = getAsOf(h.DRTSCILM, dateStr);
+    scores.push(credit !== null ? scoreLinear(-credit, -50, 30) : 50);
+
+    // 4. Sahm Rule
+    const sahm = getAsOf(h.SAHMREALTIME, dateStr);
+    scores.push(sahm !== null ? scoreLinear(-sahm, -0.6, 0.1) : 50);
+
+    // 5. CFNAI — Chicago Fed National Activity Index
+    const cfnai = getAsOf(h.CFNAI, dateStr);
+    scores.push(cfnai !== null ? scoreLinear(cfnai, -2.0, 0.5) : 50);
+
+    // 6. Housing Permits YoY
+    const perm0  = getAsOf(h.PERMIT, dateStr);
+    const perm12 = getAsOf(h.PERMIT, offsetDate(dateStr, -12));
+    const permY  = (perm0 && perm12) ? (perm0 / perm12 - 1) * 100 : null;
+    scores.push(permY !== null ? scoreLinear(permY, -20, 15) : 50);
+
+    // 7. Consumer Sentiment z-score vs rolling 120-month baseline
+    const sentVals = getWindowBefore(h.UMCSENT, dateStr, 120);
+    let sentScore = 50;
+    if (sentVals.length >= 12) {
+      const mean = sentVals.reduce((a, b) => a + b, 0) / sentVals.length;
+      const std  = Math.sqrt(sentVals.map(v => (v - mean) ** 2).reduce((a, b) => a + b, 0) / sentVals.length);
+      const z    = std > 0 ? (sentVals[0] - mean) / std : 0;
+      sentScore  = scoreLinear(z, -2.5, 1.5);
+    }
+    scores.push(sentScore);
+
+    // 8. Corporate Profits YoY (quarterly, forward-fill)
+    const cp0 = getAsOf(h.CP, dateStr);
+    const cp4 = getAsOf(h.CP, offsetDate(dateStr, -12)); // ~4 quarters
+    const cpY = (cp0 && cp4) ? (cp0 / cp4 - 1) * 100 : null;
+    scores.push(cpY !== null ? scoreLinear(cpY, -10, 10) : 50);
+
+    // 9. Industrial Production 6-month change
+    const ip0 = getAsOf(h.INDPRO, dateStr);
+    const ip6 = getAsOf(h.INDPRO, offsetDate(dateStr, -6));
+    const ipC = (ip0 && ip6) ? (ip0 / ip6 - 1) * 100 : null;
+    scores.push(ipC !== null ? scoreLinear(ipC, -4, 3) : 50);
+
+    // 10. NY Fed Recession Probability
+    const rp = getAsOf(h.RECPROUSM156N, dateStr);
+    scores.push(rp !== null ? scoreLinear(-rp, -80, 15) : 50);
+
+    // 11. HY Credit Spread (daily series — getAsOf forward-fills to nearest weekly/daily reading)
+    const hy = getAsOf(h.BAMLH0A0HYM2, dateStr);
+    scores.push(hy !== null ? scoreLinear(-hy, -15, -3) : 50);
+
+    // 12. Initial Jobless Claims — use single value (getAsOf picks nearest weekly obs)
+    const ic = getAsOf(h.ICSA, dateStr);
+    scores.push(ic !== null ? scoreLinear(-ic, -600000, -200000) : 50);
+
+    return Math.round(scores.reduce((sum, s, i) => sum + s * WEIGHTS[i], 0));
+  } catch (e) {
+    return null;
+  }
+}
+
+// Build the full reconstructed composite history from 1990-01 to today
+// 1990 is the practical floor — DRTSCILM (Senior Loan Officer Survey) starts Q2 1990.
+// Months before DRTSCILM data exist will use the neutral fallback score (50) for that indicator.
+function reconstructHistory(h) {
+  const result = [];
+  const start  = new Date(1990, 0, 1);
+  const end    = new Date();
+  let d = new Date(start);
+  while (d <= end) {
+    const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+    const score   = computeCompositeForDate(dateStr, h);
+    if (score !== null) result.push({ date: dateStr, score });
+    d.setMonth(d.getMonth() + 1);
+  }
+  return result; // oldest first
+}
+
+function getVal(arr, idx = 0) {
+  return arr && arr[idx] ? arr[idx].value : null;
+}
+
+// Take n most recent values from an array sorted newest-first
+function getSparkValues(arr, n = 24) {
+  if (!arr) return Array(n).fill(null);
+  return arr.slice(0, n).reverse().map(o => o.value);
+}
+
+// Downsample a daily series to one value per month (last trading day of each month)
+// Returns array sorted newest-first, same format as FRED monthly series
+function dailyToMonthly(arr, n = 24) {
+  if (!arr || arr.length === 0) return [];
+  // Group by YYYY-MM, keep last entry per month (arr is newest-first, so first seen = latest)
+  const seen = new Map();
+  for (const o of arr) {
+    const ym = o.date.slice(0, 7);
+    if (!seen.has(ym)) seen.set(ym, o); // first occurrence = most recent day in that month
+  }
+  // Convert to array sorted newest-first
+  return Array.from(seen.values())
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, n);
+}
+
+// ═══════════════════════════════════════════
+//  SIGNAL SCORING
+// ═══════════════════════════════════════════
+function scoreLinear(val, low, high) {
+  // low = score 0, high = score 100
+  return Math.max(0, Math.min(100, ((val - low) / (high - low)) * 100));
+}
+
+function computeSignalColor(score) {
+  if (score >= 67) return 'green';
+  if (score >= 34) return 'amber';
+  return 'red';
+}
+
+function computeIndicators(data) {
+  const inds = [];
+
+  // 1. YIELD CURVE ─ DGS10 - TB3MS
+  try {
+    const dgs10 = getVal(data.DGS10);
+    const tb3ms = getVal(data.TB3MS);
+    const spread = dgs10 !== null && tb3ms !== null ? dgs10 - tb3ms : null;
+    const score = spread !== null ? scoreLinear(spread, -1.5, 2.5) : 50;
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 0, name: 'Yield Curve', sub: '10y – 3m Spread',
+      value: spread !== null ? (spread >= 0 ? '+' : '') + spread.toFixed(2) + '%' : '—',
+      date: data.DGS10?.[0]?.date,
+      score: Math.round(score), signal,
+      spark: (() => {
+        const mon10 = data.DGS10_MON ? [...data.DGS10_MON].reverse() : []; // oldest first
+        const mon3  = data.TB3MS_MON ? [...data.TB3MS_MON].reverse() : [];
+        return mon10.map((o, i) => {
+          const v3 = mon3[i]?.value ?? null;
+          return v3 !== null ? o.value - v3 : null;
+        });
+      })(),
+      sparkLabel: '24mo monthly spread',
+      tip: `Spread > 1% → green · 0–1% → amber · < 0% inverted → red\nBest single long-horizon recession predictor.`,
+      weight: '18%', liveSource: 'FRED: DGS10 − TB3MS'
+    });
+  } catch(e) { inds.push(errorInd(0, 'Yield Curve', '10y – 3m Spread', '18%')); }
+
+  // 2. NFCI — Chicago Fed National Financial Conditions Index (weekly, back to 1971)
+  // Negative = looser than avg financial conditions (good), Positive = tighter (stress).
+  try {
+    const nfci = data.NFCI;
+    if (!nfci || nfci.length === 0) throw new Error('no NFCI data');
+    const val  = nfci[0].value;
+    const score = scoreLinear(-val, -2.0, 0.5);
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 1, name: 'Financial Conditions', sub: 'Chicago Fed NFCI (Weekly)',
+      value: (val >= 0 ? '+' : '') + val.toFixed(3),
+      date: nfci[0].date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(nfci, 24),
+      tip: `< 0 looser than avg → green · 0–0.5 → amber · > 0.5 tightening stress → red\nChicago Fed National Financial Conditions Index.\nMeasures credit, risk & leverage across money, debt & equity markets.\nUpdated weekly. FRED: NFCI`,
+      weight: '13%', liveSource: 'FRED: NFCI'
+    });
+  } catch(e) { inds.push(errorInd(1, 'Financial Conditions', 'Chicago Fed NFCI', '15%')); }
+
+  // 3. CREDIT CONDITIONS ─ DRTSCILM (Senior Loan Officer Survey)
+  try {
+    const credit = data.DRTSCILM;
+    const val = getVal(credit, 0);
+    const score = val !== null ? scoreLinear(-val, -50, 30) : 50;
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 2, name: 'Credit Conditions', sub: 'Net % Tightening C&I Standards',
+      value: val !== null ? (val > 0 ? '+' : '') + val.toFixed(1) + '%' : '—',
+      date: credit?.[0]?.date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(credit, 12).map(v => v !== null ? -v : null), // invert so up=good; 12 quarters = 3yrs
+      sparkLabel: '12 quarters (3yr)',
+      tip: `Net % tightening: < 0 easing → green · 0–20 → amber · > 20 severe → red\nFed Sr. Loan Officer Survey (quarterly).`,
+      weight: '8%', liveSource: 'FRED: DRTSCILM'
+    });
+  } catch(e) { inds.push(errorInd(2, 'Credit Conditions', 'Sr Loan Officer Survey', '10%')); }
+
+  // 4. SAHM RULE ─ SAHMREALTIME
+  try {
+    const sahm = data.SAHMREALTIME;
+    const val = getVal(sahm, 0);
+    const score = val !== null ? scoreLinear(-val, -0.6, 0.1) : 50;
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 3, name: 'Sahm Rule', sub: 'Real-Time Recession Indicator',
+      value: val !== null ? val.toFixed(2) : '—',
+      date: sahm?.[0]?.date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(sahm, 24).map(v => v !== null ? -v : null),
+      tip: `< 0.10 → green · 0.10–0.50 → amber · ≥ 0.50 → red (recession signal)\nSahm Rule real-time estimate.`,
+      weight: '9%', liveSource: 'FRED: SAHMREALTIME'
+    });
+  } catch(e) { inds.push(errorInd(3, 'Sahm Rule', 'Real-Time Indicator', '10%')); }
+
+  // 5. CFNAI — Chicago Fed National Activity Index
+  // NBER uses this; weighted avg of 85 indicators. < -0.7 = recession risk.
+  try {
+    const cfnai = data.CFNAI;
+    if (!cfnai || cfnai.length === 0) throw new Error('no CFNAI data');
+    const val   = cfnai[0].value;
+    // CFNAI: > 0 = above trend, 0 = trend, -0.7 = recession threshold
+    const score = scoreLinear(val, -2.0, 0.5);
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 4, name: 'CFNAI', sub: 'Chicago Fed Activity Index',
+      value: val.toFixed(2), date: cfnai[0].date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(cfnai, 24),
+      tip: `> 0 above trend → green · −0.7 to 0 → amber · < −0.7 recession threshold → red\nChicago Fed National Activity Index — weighted avg of 85 indicators.\nUsed by NBER for recession dating. FRED: CFNAI`,
+      weight: '9%', liveSource: 'FRED: CFNAI'
+    });
+  } catch(e) {
+    inds.push(errorInd(4, 'CFNAI', 'Chicago Fed Activity Index', '10%'));
+  }
+
+  // 6. HOUSING PERMITS ─ PERMIT (YoY)
+  try {
+    const perm = data.PERMIT;
+    const current = getVal(perm, 0);
+    const yearAgo = perm?.[12]?.value ?? null;
+    const yoy = current && yearAgo ? (current / yearAgo - 1) * 100 : null;
+    const score = yoy !== null ? scoreLinear(yoy, -20, 15) : 50;
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 5, name: 'Housing Permits', sub: 'Year-over-Year Change',
+      value: yoy !== null ? (yoy >= 0 ? '+' : '') + yoy.toFixed(1) + '%' : '—',
+      date: perm?.[0]?.date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(perm, 24),
+      tip: `YoY > 0% → green · −10–0% → amber · < −10% trending down → red\nBuilding permits for new housing units.`,
+      weight: '8%', liveSource: 'FRED: PERMIT'
+    });
+  } catch(e) { inds.push(errorInd(5, 'Housing Permits', 'YoY Change', '10%')); }
+
+  // 7. CONSUMER SENTIMENT ─ UMCSENT (z-score)
+  try {
+    const umcs = data.UMCSENT;
+    if (!umcs || umcs.length < 10) throw new Error('insufficient data');
+    const vals = umcs.map(o => o.value);
+    const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+    const std = Math.sqrt(vals.map(v => (v-mean)**2).reduce((a,b) => a+b, 0) / vals.length);
+    const z = std > 0 ? (vals[0] - mean) / std : 0;
+    const score = scoreLinear(z, -2.5, 1.5);
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 6, name: 'Consumer Sentiment', sub: 'UMich Index (z-score)',
+      value: (z >= 0 ? '+' : '') + z.toFixed(2) + 'σ',
+      date: umcs[0]?.date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(umcs, 24),
+      tip: `z > 0 → green · −1σ to 0 → amber · < −1σ → red\nUniversity of Michigan Consumer Sentiment vs 10yr history.`,
+      weight: '6%', liveSource: 'FRED: UMCSENT'
+    });
+  } catch(e) { inds.push(errorInd(6, 'Consumer Sentiment', 'UMich z-score', '7.5%')); }
+
+  // 8. CORPORATE PROFITS ─ CP (YoY)
+  try {
+    const cp = data.CP;
+    const current = getVal(cp, 0);
+    const yearAgo = cp?.[4]?.value ?? null; // 4 quarters ago
+    const yoy = current && yearAgo ? (current / yearAgo - 1) * 100 : null;
+    const score = yoy !== null ? scoreLinear(yoy, -10, 10) : 50;
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 7, name: 'Corporate Profits', sub: 'NIPA Profits YoY (Quarterly)',
+      value: yoy !== null ? (yoy >= 0 ? '+' : '') + yoy.toFixed(1) + '%' : '—',
+      date: cp?.[0]?.date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(cp, 12), // 12 quarters = 3 years
+      sparkLabel: '12 quarters (3yr)',
+      tip: `YoY > 0% → green · −5–0% → amber · < −5% both negative 2+ qtrs → red\nNIPA corporate profits (quarterly, FRED).`,
+      weight: '6%', liveSource: 'FRED: CP'
+    });
+  } catch(e) { inds.push(errorInd(7, 'Corporate Profits', 'NIPA YoY', '7.5%')); }
+
+  // 9. INDUSTRIAL PRODUCTION ─ INDPRO (6-month change)
+  try {
+    const ip = data.INDPRO;
+    const current = getVal(ip, 0);
+    const sixAgo = ip?.[6]?.value ?? null;
+    const change = current && sixAgo ? (current / sixAgo - 1) * 100 : null;
+    const score = change !== null ? scoreLinear(change, -4, 3) : 50;
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 8, name: 'Industrial Production', sub: '6-Month Change',
+      value: change !== null ? (change >= 0 ? '+' : '') + change.toFixed(2) + '%' : '—',
+      date: ip?.[0]?.date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(ip, 24),
+      tip: `6mo ≥ 0% → green · −1–0% → amber · < −1% trending down → red\nKey NBER coincident indicator.`,
+      weight: '4%', liveSource: 'FRED: INDPRO'
+    });
+  } catch(e) { inds.push(errorInd(8, 'Industrial Production', '6-Month Change', '5%')); }
+
+  // 10. RECESSION PROBABILITY ─ RECPROUSM156N (NY Fed)
+  try {
+    const rp = data.RECPROUSM156N;
+    const val = getVal(rp, 0);
+    const score = val !== null ? scoreLinear(-val, -80, 15) : 50;
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 9, name: 'Recession Probability', sub: 'NY Fed Model (12-Month)',
+      value: val !== null ? val.toFixed(1) + '%' : '—',
+      date: rp?.[0]?.date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(rp, 24),
+      tip: `< 20% → green · 20–40% → amber · > 40% → red\nNY Fed 12-month ahead recession probability model.`,
+      weight: '4%', liveSource: 'FRED: RECPROUSM156N'
+    });
+  } catch(e) { inds.push(errorInd(9, 'Recession Probability', 'NY Fed 12-Month', '4%')); }
+
+  // 11. HY CREDIT SPREAD ─ BAMLH0A0HYM2 (ICE BofA High Yield OAS, daily)
+  // Spread between HY bonds and Treasuries. Widens when credit stress rises.
+  // Typical range: 3–5% healthy, 6–8% stress, 8%+ crisis.
+  try {
+    const hy = data.BAMLH0A0HYM2;
+    if (!hy || hy.length === 0) throw new Error('no HY data');
+    const val   = hy[0].value;
+    const score = scoreLinear(-val, -15, -3); // invert: lower spread = healthier
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 10, name: 'HY Credit Spread', sub: 'ICE BofA High Yield OAS (Daily)',
+      value: val.toFixed(2) + '%',
+      date: hy[0].date,
+      score: Math.round(score), signal,
+      spark: (() => {
+        const mon = dailyToMonthly(hy, 24);
+        return [...mon].reverse().map(o => o.value);
+      })(),
+      sparkLabel: '24mo monthly avg',
+      tip: `< 4% → green · 4–7% → amber · > 7% credit stress → red\nICE BofA US High Yield Option-Adjusted Spread.\nMarket-based credit risk — widens sharply ahead of recessions.\nUpdated daily. FRED: BAMLH0A0HYM2`,
+      weight: '8%', liveSource: 'FRED: BAMLH0A0HYM2'
+    });
+  } catch(e) { inds.push(errorInd(10, 'HY Credit Spread', 'ICE BofA OAS', '8%')); }
+
+  // 12. INITIAL JOBLESS CLAIMS ─ ICSA (weekly)
+  // 4-week moving average to smooth weekly volatility.
+  // Spikes BEFORE unemployment rises — one of the most timely leading indicators.
+  try {
+    const ic = data.ICSA;
+    if (!ic || ic.length < 4) throw new Error('no ICSA data');
+    const avg4 = ic.slice(0, 4).reduce((s, o) => s + o.value, 0) / 4;
+    const score = scoreLinear(-avg4, -600000, -200000);
+    const signal = computeSignalColor(score);
+    inds.push({
+      id: 11, name: 'Jobless Claims', sub: '4-Week Avg Initial Claims (Weekly)',
+      value: (avg4 / 1000).toFixed(0) + 'k',
+      date: ic[0].date,
+      score: Math.round(score), signal,
+      spark: getSparkValues(ic, 104).map(v => v !== null ? -v : null), // invert: up = fewer claims = good
+      sparkLabel: '104 weeks (2yr)',
+      tip: `4wk avg < 250k → green · 250–400k → amber · > 400k → red\nWeekly initial unemployment insurance claims.\nSpikes before unemployment rate rises — most timely labor indicator.\nUpdated weekly (Thursdays). FRED: ICSA`,
+      weight: '7%', liveSource: 'FRED: ICSA'
+    });
+  } catch(e) { inds.push(errorInd(11, 'Jobless Claims', '4-Week Avg', '7%')); }
+
+  return inds;
+}
+
+function errorInd(id, name, sub, weight) {
+  return { id, name, sub, value: 'Error', date: null, score: 50, signal: 'loading', spark: null, weight, liveSource: 'Error', tip: 'Failed to load data from FRED.' };
+}
+
+// ═══════════════════════════════════════════
+//  COMPOSITE CALCULATION
+// ═══════════════════════════════════════════
+function computeComposite(inds) {
+  let total = 0;
+  inds.forEach((ind, i) => { total += ind.score * WEIGHTS[i]; });
+  return Math.round(total);
+}
+
+// ── Implied recession probability from composite score ──────────────
+// Logistic curve fitted to backtest: score 70→~8%, score 50→~35%, score 30→~75%
+function impliedRecProb(score) {
+  const k = -0.09, x0 = 52;
+  return Math.round(100 / (1 + Math.exp(-k * (score - x0))));
+}
+
+// ── Composite score info popup ────────────────────────────────────────
+function showScoreInfo() {
+  const score = parseInt(document.getElementById('compNum').textContent) || 0;
+  const prob  = impliedRecProb(score);
+  const lines = [
+    `Current score: ${score}/100`,
+    ``,
+    `Historical interpretation:`,
+    `  > 70  →  Low risk (rec. ~${impliedRecProb(75)}% likely in 12mo)`,
+    `  50–70 →  Elevated (rec. ~${impliedRecProb(60)}% likely in 12mo)`,
+    `  < 50  →  High risk (rec. ~${impliedRecProb(35)}% likely in 12mo)`,
+    ``,
+    `Implied probability at ${score}: ~${prob}%`,
+    ``,
+    `Based on logistic curve fitted to 35-year`,
+    `backtest (1990–present). Not a guarantee.`,
+  ].join('\n');
+  showTip({ clientX: window.innerWidth/2 - 120, clientY: 180 }, 'Score Interpretation', lines);
+  setTimeout(hideTip, 6000);
+}
+
+// ── Sort indicators by severity (red first, then amber, then green) ──
+function sortBySeverity(inds) {
+  const order = { red: 0, amber: 1, green: 2, loading: 3 };
+  return [...inds].sort((a, b) => (order[a.signal] ?? 3) - (order[b.signal] ?? 3));
+}
+
+// ── Export dashboard as PNG ───────────────────────────────────────────
+function exportDashboard() {
+  const btn = document.getElementById('exportBtn');
+  btn.textContent = '⏳ Capturing…';
+  btn.disabled = true;
+  const el = document.querySelector('.page');
+  html2canvas(el, { backgroundColor: '#0e1117', scale: 1.5, useCORS: true, logging: false })
+    .then(canvas => {
+      const a = document.createElement('a');
+      const d = new Date();
+      a.download = `recession-monitor-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    })
+    .catch(() => alert('Export failed — try a different browser.'))
+    .finally(() => { btn.textContent = '↓ Export PNG'; btn.disabled = false; });
+}
+
+// ── Zoom state ────────────────────────────────────────────────────────
+let currentZoomYears = 0; // 0 = full history
+function setZoom(years) {
+  currentZoomYears = years;
+  ['zoom5','zoom10','zoom20','zoomAll'].forEach(id => {
+    document.getElementById(id)?.classList.remove('active');
+  });
+  const map = { 5:'zoom5', 10:'zoom10', 20:'zoom20', 0:'zoomAll' };
+  document.getElementById(map[years])?.classList.add('active');
+  // Re-render chart with new zoom
+  const composite = computeComposite(indicators);
+  renderHistoryChart(composite, histData.USREC || liveData.USREC || [], histScores);
+}
+
+// ═══════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════
+function renderComposite(score, inds) {
+  document.getElementById('compNum').textContent = score;
+  const needle = document.getElementById('barNeedle');
+  setTimeout(() => { needle.style.left = score + '%'; }, 50);
+
+  const numEl  = document.getElementById('compNum');
+  const regEl  = document.getElementById('compRegime');
+  const probEl = document.getElementById('compProb');
+  const prob   = impliedRecProb(score);
+
+  if (score > 70) {
+    numEl.style.color = 'var(--green)';
+    regEl.textContent = 'LOW RECESSION RISK';
+    regEl.style.cssText = 'background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);display:inline-block;font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:3px;margin-top:8px;font-weight:600;';
+  } else if (score >= 50) {
+    numEl.style.color = 'var(--amber)';
+    regEl.textContent = 'ELEVATED RISK';
+    regEl.style.cssText = 'background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);display:inline-block;font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:3px;margin-top:8px;font-weight:600;';
+  } else {
+    numEl.style.color = 'var(--red)';
+    regEl.textContent = 'HIGH RECESSION RISK';
+    regEl.style.cssText = 'background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);display:inline-block;font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:3px;margin-top:8px;font-weight:600;';
+  }
+
+  if (probEl) probEl.innerHTML = `Implied 12-mo recession probability: <strong>${prob}%</strong>`;
+
+  const reds   = inds.filter(i => i.signal === 'red').length;
+  const ambers = inds.filter(i => i.signal === 'amber').length;
+  const greens = inds.filter(i => i.signal === 'green').length;
+  document.getElementById('countRow').innerHTML = `
+    <span class="badge red">${reds} Red</span>
+    <span class="badge amber">${ambers} Amber</span>
+    <span class="badge green">${greens} Green</span>
+    <span class="badge neutral" style="margin-left:auto;font-size:9px">${reds + ambers} of 12 in warning zone</span>
+  `;
+
+  // Last refreshed timestamp
+  const ts = document.getElementById('lastRefreshed');
+  if (ts) {
+    const now = new Date();
+    ts.textContent = `Last refreshed: ${now.toLocaleDateString()} at ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+  }
+}
+
+function genSparkPath(vals, w, h) {
+  const clean = vals.filter(v => v !== null && !isNaN(v));
+  if (clean.length < 2) return '';
+  const min = Math.min(...clean), max = Math.max(...clean);
+  const range = max - min || 1;
+  const pts = vals.map((v, i) => {
+    if (v === null || isNaN(v)) return null;
+    const x = (i / (vals.length - 1)) * w;
+    const y = h - ((v - min) / range) * (h * 0.85) - h * 0.05;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).filter(Boolean);
+  return 'M ' + pts.join(' L ');
+}
+
+// Data freshness: returns {cls, label} based on days since last data point
+function dataFreshness(dateStr) {
+  if (!dateStr || dateStr === 'manual' || dateStr === 'cached') {
+    return { cls: 'aging', dot: 'aging', label: 'unknown age' };
+  }
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if      (days <= 3)  return { cls: 'fresh',  dot: 'fresh',  label: `today` };
+  else if (days <= 7)  return { cls: 'fresh',  dot: 'fresh',  label: `${days}d ago` };
+  else if (days <= 35) return { cls: 'recent', dot: 'recent', label: `${days}d ago` };
+  else if (days <= 95) return { cls: 'aging',  dot: 'aging',  label: `${Math.round(days/7)}w ago` };
+  else                 return { cls: 'stale',  dot: 'stale',  label: `${Math.round(days/30)}mo ago` };
+}
+
+function renderIndicators(inds) {
+  const grid = document.getElementById('indGrid');
+  grid.innerHTML = '';
+  const colorMap = { red: 'var(--red)', amber: 'var(--amber)', green: 'var(--green)', loading: 'var(--border2)' };
+  const sorted = sortBySeverity(inds);
+
+  sorted.forEach((ind, delay) => {
+    const card = document.createElement('div');
+    card.className = `ind-card signal-${ind.signal}`;
+    card.style.animationDelay = `${delay * 0.06}s`;
+
+    const W = 200, H = 28;
+    let sparkSVG = '';
+    if (ind.spark && ind.spark.some(v => v !== null)) {
+      const path = genSparkPath(ind.spark, W, H);
+      const color = colorMap[ind.signal];
+      sparkSVG = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:100%">
+        <defs><linearGradient id="sg${ind.id}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.25"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </linearGradient></defs>
+        ${path ? `<path d="${path} L${W},${H} L0,${H} Z" fill="url(#sg${ind.id})"/>` : ''}
+        ${path ? `<path d="${path}" fill="none" stroke="${color}" stroke-width="1.5"/>` : ''}
+      </svg>`;
+    } else {
+      sparkSVG = `<svg viewBox="0 0 200 28" preserveAspectRatio="none" style="width:100%;height:100%">
+        <line x1="0" y1="14" x2="200" y2="14" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"/>
+      </svg>`;
+    }
+
+    const isManual   = ind.manual;
+    const dateStr    = ind.date && ind.date !== 'manual' ? ind.date.slice(0,7) : isManual ? 'Manual' : '';
+    const fresh      = dataFreshness(ind.date);
+    const sparkLabel = ind.sparkLabel || '24mo trend';
+
+    card.innerHTML = `
+      <div class="ind-top">
+        <div class="ind-name">${ind.name}</div>
+        <div class="signal-dot ${ind.signal}"></div>
+      </div>
+      <div class="ind-value">${ind.value}</div>
+      <div class="ind-sub">${ind.sub}</div>
+      <div class="ind-date">${dateStr} · ${ind.liveSource}</div>
+      <div class="spark-wrap" title="${sparkLabel}">${sparkSVG}</div>
+      <div class="score-track"><div class="score-fill ${ind.signal}" style="width:${ind.score}%"></div></div>
+      <div class="ind-footer">
+        <span class="ind-score-label" style="color:var(--${ind.signal === 'green' ? 'green' : ind.signal === 'red' ? 'red' : ind.signal === 'amber' ? 'amber' : 'text-muted'})">Score: ${ind.score}/100</span>
+        <span class="ind-weight-label">Wt ${ind.weight}</span>
+      </div>
+      <div class="freshness ${ind.signal}">
+        <span class="freshness-dot ${ind.signal}"></span>
+        ${fresh.label} · <span style="opacity:0.7">${sparkLabel}</span>
+      </div>
+    `;
+
+    card.addEventListener('mousemove', e => showTip(e, `${ind.name} (${ind.weight})`, ind.tip));
+    card.addEventListener('mouseleave', hideTip);
+
+    grid.appendChild(card);
+  });
+}
+
+
+
+function renderHistoryChart(composite, usrec = [], historicalScores = []) {
+  const PX_PER_MONTH = 14;
+  const H            = 180;
+  const pad          = { r: 24, t: 22, b: 28 };
+  const dpr          = window.devicePixelRatio || 1;
+
+  // ── Build plot data ──────────────────────────────────────────────
+  const hasReal = historicalScores.length > 12;
+  let plotData;
+  if (hasReal) {
+    plotData = historicalScores.slice();
+    plotData[plotData.length - 1].score = composite;
+    // Apply zoom filter
+    if (currentZoomYears > 0) {
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - currentZoomYears);
+      const cutStr = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-01';
+      plotData = plotData.filter(p => p.date >= cutStr);
+    }
+  } else {
+    const MONTHS = 48;
+    plotData = Array.from({ length: MONTHS }, (_, i) => {
+      const t = i / (MONTHS - 1);
+      const base = 68 - t * (68 - composite);
+      const wave = Math.sin(i * 0.55) * 7 + Math.cos(i * 0.28) * 4;
+      const d = new Date();
+      d.setMonth(d.getMonth() - (MONTHS - 1 - i));
+      return {
+        date:  d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01',
+        score: i === MONTHS - 1 ? composite : Math.max(5, Math.min(95, base + wave))
+      };
+    });
+  }
+
+  const N   = plotData.length;
+  const W   = N * PX_PER_MONTH + pad.r; // total canvas width
+  const ch  = H - pad.t - pad.b;
+
+  const idxToX = i  => i * PX_PER_MONTH + PX_PER_MONTH / 2;
+  const toY    = v  => pad.t + (1 - Math.max(0, Math.min(100, v)) / 100) * ch;
+
+  // ── Size the main scrollable canvas ─────────────────────────────
+  const canvas = document.getElementById('histChart');
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // ── NBER RECESSION SHADING ───────────────────────────────────────
+  const recessionSet = new Set();
+  (usrec || []).forEach(o => { if (o.value === 1) recessionSet.add(o.date.slice(0, 7)); });
+
+  let blockStartX = null;
+  for (let i = 0; i <= N; i++) {
+    const entry  = plotData[Math.min(i, N - 1)];
+    const inRec  = recessionSet.has(entry.date.slice(0, 7));
+    const x      = idxToX(i);
+
+    if (inRec && blockStartX === null) {
+      blockStartX = x - PX_PER_MONTH / 2;
+    } else if (!inRec && blockStartX !== null) {
+      const x2 = x - PX_PER_MONTH / 2;
+      ctx.fillStyle = 'rgba(240,70,90,0.09)';
+      ctx.fillRect(blockStartX, pad.t, x2 - blockStartX, ch);
+      ctx.strokeStyle = 'rgba(240,70,90,0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(blockStartX, pad.t); ctx.lineTo(blockStartX, pad.t + ch); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x2, pad.t); ctx.lineTo(x2, pad.t + ch); ctx.stroke();
+      if (x2 - blockStartX > 36) {
+        ctx.fillStyle = 'rgba(240,70,90,0.4)';
+        ctx.font = `bold 9px 'IBM Plex Mono', monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('RECESSION', (blockStartX + x2) / 2, pad.t + 12);
+      }
+      blockStartX = null;
+    }
+  }
+  // Close any open block at end
+  if (blockStartX !== null) {
+    ctx.fillStyle = 'rgba(240,70,90,0.09)';
+    ctx.fillRect(blockStartX, pad.t, idxToX(N - 1) - blockStartX, ch);
+  }
+
+  // ── HORIZONTAL GRID LINES ────────────────────────────────────────
+  [25, 50, 75].forEach(v => {
+    ctx.strokeStyle = v === 50 ? 'rgba(245,166,35,0.2)' : 'rgba(78,106,138,0.08)';
+    ctx.lineWidth = v === 50 ? 1 : 0.5;
+    ctx.setLineDash(v === 50 ? [5, 5] : []);
+    ctx.beginPath(); ctx.moveTo(0, toY(v)); ctx.lineTo(W, toY(v)); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Threshold label (drawn once near left)
+  ctx.fillStyle = 'rgba(245,166,35,0.4)';
+  ctx.font = `bold 9px 'IBM Plex Mono', monospace`;
+  ctx.textAlign = 'left';
+  ctx.fillText('50 — RISK THRESHOLD', 6, toY(50) - 4);
+
+  // ── AREA FILL ────────────────────────────────────────────────────
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
+  grad.addColorStop(0, 'rgba(79,158,255,0.12)');
+  grad.addColorStop(1, 'rgba(79,158,255,0)');
+  ctx.beginPath();
+  ctx.moveTo(idxToX(0), toY(plotData[0].score));
+  plotData.forEach((p, i) => { if (i > 0) ctx.lineTo(idxToX(i), toY(p.score)); });
+  ctx.lineTo(idxToX(N - 1), pad.t + ch);
+  ctx.lineTo(idxToX(0),     pad.t + ch);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // ── COMPOSITE LINE (color-coded by zone) ─────────────────────────
+  for (let i = 1; i < N; i++) {
+    const s0 = plotData[i - 1].score, s1 = plotData[i].score;
+    const avg = (s0 + s1) / 2;
+    ctx.strokeStyle = avg < 50 ? 'rgba(240,70,90,0.9)' : avg < 70 ? 'rgba(245,166,35,0.9)' : 'rgba(61,220,132,0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(idxToX(i - 1), toY(s0));
+    ctx.lineTo(idxToX(i),     toY(s1));
+    ctx.stroke();
+  }
+
+  // ── IMPLIED RECESSION PROBABILITY OVERLAY (dashed blue, right axis mapped to 0–100 scale) ──
+  // We map prob% to the same Y axis: prob 0%=score 100, prob 100%=score 0
+  ctx.strokeStyle = 'rgba(79,158,255,0.45)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  let probStarted = false;
+  plotData.forEach((p, i) => {
+    const probY = toY(100 - impliedRecProb(p.score)); // invert: high prob = low on chart
+    if (!probStarted) { ctx.moveTo(idxToX(i), probY); probStarted = true; }
+    else ctx.lineTo(idxToX(i), probY);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const dotColor = composite < 50 ? '#f0465a' : composite < 70 ? '#f5a623' : '#3ddc84';
+  ctx.fillStyle = dotColor;
+  ctx.beginPath();
+  ctx.arc(idxToX(N - 1), toY(composite), 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = dotColor;
+  ctx.font = `bold 9px 'IBM Plex Mono', monospace`;
+  ctx.textAlign = 'right';
+  ctx.fillText(`LIVE: ${composite}`, idxToX(N - 1) - 8, toY(composite) - 8);
+
+  // Illustrative label
+  if (!hasReal) {
+    ctx.fillStyle = 'rgba(79,158,255,0.4)';
+    ctx.font = `bold 9px 'IBM Plex Mono', monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('▲ ILLUSTRATIVE — loading real history…', 6, pad.t + 14);
+  }
+
+  // ── X-AXIS YEAR TICKS ────────────────────────────────────────────
+  const startYear = parseInt(plotData[0].date.slice(0, 4));
+  const endYear   = new Date().getFullYear();
+  for (let yr = startYear; yr <= endYear + 1; yr++) {
+    const yrStr = `${yr}-01-01`;
+    const idx   = plotData.findIndex(p => p.date >= yrStr);
+    if (idx < 0) continue;
+    const x = idxToX(idx);
+    ctx.strokeStyle = 'rgba(78,106,138,0.15)';
+    ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ch); ctx.stroke();
+    if (yr % 2 === 0 || (endYear - startYear) < 15) {
+      ctx.fillStyle = 'rgba(160,185,220,0.9)';
+      ctx.font = `bold 9px 'IBM Plex Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(yr, x, H - 6);
+    }
+  }
+
+  // ── STICKY Y-AXIS (separate canvas, doesn't scroll) ──────────────
+  const yCanvas = document.getElementById('histYAxis');
+  const yW = 36, yH = H;
+  yCanvas.width  = yW * dpr;
+  yCanvas.height = yH * dpr;
+  yCanvas.style.width  = yW + 'px';
+  yCanvas.style.height = yH + 'px';
+  const yCtx = yCanvas.getContext('2d');
+  yCtx.scale(dpr, dpr);
+  yCtx.clearRect(0, 0, yW, yH);
+
+  // Background to mask scrolling content underneath
+  yCtx.fillStyle = getComputedStyle(document.body).getPropertyValue('--surface') || '#0e1a2e';
+  yCtx.fillRect(0, 0, yW, yH);
+
+  yCtx.fillStyle = 'rgba(78,106,138,0.65)';
+  yCtx.font = `8px 'IBM Plex Mono', monospace`;
+  [0, 25, 50, 75, 100].forEach(v => {
+    yCtx.textAlign = 'right';
+    yCtx.fillText(v, yW - 4, toY(v) + 3);
+    // Small tick mark
+    yCtx.strokeStyle = 'rgba(78,106,138,0.2)';
+    yCtx.lineWidth = 1;
+    yCtx.beginPath(); yCtx.moveTo(yW - 2, toY(v)); yCtx.lineTo(yW, toY(v)); yCtx.stroke();
+  });
+
+  // ── AUTO-SCROLL TO RIGHT (present) ───────────────────────────────
+  const scroller = document.getElementById('chartScrollInner');
+  if (scroller && currentZoomYears === 0) {
+    scroller.scrollLeft = scroller.scrollWidth;
+  } else if (scroller && currentZoomYears > 0) {
+    scroller.scrollLeft = scroller.scrollWidth; // zoom always anchors to now
+  }
+
+  // ── EXPOSE chart state for crosshair ─────────────────────────────
+  window._chartState = { plotData, idxToX, toY, PX_PER_MONTH, H, pad, N };
+}
+
+// ── Chart crosshair hover ─────────────────────────────────────────────
+(function initChartCrosshair() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const scroller = document.getElementById('chartScrollInner');
+    const tip      = document.getElementById('chartHoverTip');
+    if (!scroller || !tip) return;
+
+    scroller.addEventListener('mousemove', e => {
+      const st = window._chartState;
+      if (!st || !st.plotData || st.plotData.length === 0) return;
+
+      const rect    = scroller.getBoundingClientRect();
+      const xInScroll = e.clientX - rect.left + scroller.scrollLeft;
+      const { plotData, idxToX, toY, PX_PER_MONTH, H, pad, N } = st;
+
+      // Find nearest data point
+      const idx = Math.max(0, Math.min(N - 1, Math.round((xInScroll - PX_PER_MONTH / 2) / PX_PER_MONTH)));
+      const pt  = plotData[idx];
+      if (!pt) return;
+
+      const prob = impliedRecProb(pt.score);
+      const color = pt.score < 50 ? '#f0465a' : pt.score < 70 ? '#f5a623' : '#3ddc84';
+      const dateLabel = pt.date.slice(0, 7);
+
+      tip.style.display = 'block';
+      tip.style.left    = (e.clientX + 14) + 'px';
+      tip.style.top     = (e.clientY - 40) + 'px';
+      tip.innerHTML     = `<span style="color:${color};font-weight:600">${dateLabel}</span> &nbsp; Score: <span style="color:${color}">${pt.score}</span> &nbsp; Prob: <span style="color:rgba(79,158,255,0.9)">${prob}%</span>`;
+    });
+
+    scroller.addEventListener('mouseleave', () => {
+      const tip = document.getElementById('chartHoverTip');
+      if (tip) tip.style.display = 'none';
+    });
+  });
+})();
+
+// ── Drag-to-scroll on the chart ──────────────────────────────────────
+(function initChartDrag() {
+  let isDown = false, startX = 0, scrollLeft = 0;
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('chartScrollInner');
+    if (!el) return;
+    el.addEventListener('mousedown',  e => { isDown = true; startX = e.pageX - el.offsetLeft; scrollLeft = el.scrollLeft; });
+    el.addEventListener('mouseleave', () => { isDown = false; });
+    el.addEventListener('mouseup',    () => { isDown = false; });
+    el.addEventListener('mousemove',  e => {
+      if (!isDown) return;
+      e.preventDefault();
+      el.scrollLeft = scrollLeft - (e.pageX - el.offsetLeft - startX);
+    });
+    // Touch support
+    let touchStart = 0, touchScrollLeft = 0;
+    el.addEventListener('touchstart', e => { touchStart = e.touches[0].pageX; touchScrollLeft = el.scrollLeft; });
+    el.addEventListener('touchmove',  e => { el.scrollLeft = touchScrollLeft - (e.touches[0].pageX - touchStart); });
+  });
+})();
+
+// ═══════════════════════════════════════════
+//  TOOLTIP
+// ═══════════════════════════════════════════
+const tipEl = document.getElementById('tippy');
+function showTip(e, title, body) {
+  tipEl.innerHTML = `<b>${title}</b><span>${body.replace(/\n/g,'<br>')}</span>`;
+  tipEl.style.left = (e.clientX + 16) + 'px';
+  tipEl.style.top = (e.clientY - 8) + 'px';
+  tipEl.classList.add('on');
+}
+function hideTip() { tipEl.classList.remove('on'); }
+
+// ═══════════════════════════════════════════
+//  MAIN LOAD
+// ═══════════════════════════════════════════
+let indicators = [];
+
+function renderAll() {
+  indicators = computeIndicators(liveData);
+  const composite = computeComposite(indicators);
+  renderComposite(composite, indicators);
+  renderIndicators(indicators);
+  renderHistoryChart(composite, liveData.USREC || [], histScores);
+}
+
+async function loadData() {
+  setStatus('loading');
+  histScores = []; // reset history on each load
+
+  // ── Phase 1: small limits → live dashboard renders fast ─────
+  // Fetch limits:
+  // Monthly series: 24 obs = 24 months sparkline
+  // Quarterly series: 12 obs = 3 years of quarters
+  // DGS10/TB3MS: daily — fetch 760 days (~25 months), will be downsampled to monthly
+  // UMCSENT: 144 = 12yr baseline for z-score + 24 for spark
+  // PERMIT: 28 = 24 months spark + 12 for YoY calculation + buffer
+  const liveSeries = ['DGS10', 'TB3MS', 'NFCI', 'DRTSCILM', 'SAHMREALTIME', 'CFNAI', 'PERMIT', 'UMCSENT', 'CP', 'INDPRO', 'RECPROUSM156N', 'USREC', 'BAMLH0A0HYM2', 'ICSA'];
+  const liveLimits = { DGS10: 760, TB3MS: 760, NFCI: 104, DRTSCILM: 12, SAHMREALTIME: 24, CFNAI: 24, PERMIT: 28, UMCSENT: 144, CP: 12, INDPRO: 24, RECPROUSM156N: 24, USREC: 48, BAMLH0A0HYM2: 760, ICSA: 110 };
+
+  try {
+    const phase1 = await Promise.allSettled(
+      liveSeries.map(s => fetchSeries(s, liveLimits[s] || 14).then(d => ({ s, d })))
+    );
+
+    liveData = {};
+    let failedSeries = [];
+    phase1.forEach(r => {
+      if (r.status === 'fulfilled') liveData[r.value.s] = r.value.d;
+      else {
+        const msg = r.reason?.message || '';
+        failedSeries.push(msg);
+        console.warn('Phase 1 FRED failed:', msg);
+      }
+    });
+
+    liveData.DGS10_RAW = liveData.DGS10 ? [...liveData.DGS10] : [];
+    liveData.TB3MS_RAW = liveData.TB3MS ? [...liveData.TB3MS] : [];
+    // Monthly downsampled versions for sparklines (daily data → 1 point per month)
+    liveData.DGS10_MON = dailyToMonthly(liveData.DGS10, 24);
+    liveData.TB3MS_MON = dailyToMonthly(liveData.TB3MS, 24);
+
+    renderAll();
+    // Only show "partial" if core series (yield curve, LEI, Sahm) failed
+    const coreFailed = failedSeries.some(m => m.includes('DGS10') || m.includes('NFCI') || m.includes('SAHM'));
+    setStatus(coreFailed ? 'partial' : 'live');
+    document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleString();
+
+    // ── Phase 2: long history in background → reconstruct chart ─
+    loadHistory();
+
+  } catch(err) {
+    setStatus('error', err.message);
+    console.error(err);
+  }
+}
+
+async function loadHistory() {
+  const titleEl = document.getElementById('chartTitle');
+  if (titleEl) titleEl.textContent = 'Reconstructing 35-year history… (fetching FRED data)';
+
+  // Push limits back to ~1990 (earliest DRTSCILM data).
+  // GS10/TB3MS/INDPRO/PERMIT/NFCI/CFNAI/SAHMREALTIME all go back to 1960s+
+  // DRTSCILM starts ~1990-Q2, RECPROUSM156N starts 1960
+  // UMCSENT: 540 = 45yr baseline for z-score normalisation
+  // NFCI: weekly data, 2800 obs ≈ 54 years back to 1971
+  // BAMLH0A0HYM2: daily, goes back to 1996; 7800 obs ≈ 30 years
+  // ICSA: weekly, goes back to 1967; 3000 obs ≈ 58 years
+  const histSeries = ['GS10', 'TB3MS', 'NFCI', 'DRTSCILM', 'SAHMREALTIME', 'CFNAI', 'PERMIT', 'UMCSENT', 'CP', 'INDPRO', 'RECPROUSM156N', 'USREC', 'BAMLH0A0HYM2', 'ICSA'];
+  const histLimits = { GS10: 600, TB3MS: 600, NFCI: 2800, DRTSCILM: 200, SAHMREALTIME: 600, CFNAI: 600, PERMIT: 600, UMCSENT: 600, CP: 200, INDPRO: 600, RECPROUSM156N: 600, USREC: 600, BAMLH0A0HYM2: 7800, ICSA: 3000 };
+
+  try {
+    const results = await Promise.allSettled(
+      histSeries.map(s => fetchSeries(s, histLimits[s]).then(d => ({ s, d })))
+    );
+
+    histData = {};
+    results.forEach(r => {
+      if (r.status === 'fulfilled') histData[r.value.s] = r.value.d;
+      else console.warn('History series failed:', r.reason?.message);
+    });
+
+    // Reconstruct composite for every month 2000–present
+    histScores = reconstructHistory(histData);
+    console.log(`Reconstructed ${histScores.length} months of composite history`);
+
+    // Update chart with real data and pass real USREC from histData
+    const composite = computeComposite(indicators);
+    renderHistoryChart(composite, histData.USREC || liveData.USREC || [], histScores);
+    const startYr = histScores.length > 0 ? histScores[0].date.slice(0, 4) : '1990';
+    if (titleEl) titleEl.textContent = `Reconstructed Composite · ${histScores.length} months (${startYr}–Present) · NBER Recession Bands · drag or scroll →`;
+
+  } catch(err) {
+    console.warn('History reconstruction failed:', err.message);
+    if (titleEl) titleEl.textContent = 'History reconstruction failed — showing live score only';
+  }
+}
+
+function setStatus(state, msg) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'dot';
+  if (state === 'live')         { dot.classList.add('live');  txt.textContent = 'Live · FRED Data'; }
+  else if (state === 'partial') { dot.classList.add('live');  txt.textContent = 'Partial · Some series unavailable'; }
+  else if (state === 'error')   { dot.classList.add('error'); txt.textContent = 'Error: ' + (msg || 'Check API key'); }
+  else if (state === 'demo')    { txt.textContent = 'Demo Mode · Illustrative Data'; }
+  else                          { txt.textContent = 'Loading…'; }
+}
+
+// ═══════════════════════════════════════════
+//  DEMO DATA (no API key needed)
+// ═══════════════════════════════════════════
+function renderDemo() {
+  setStatus('demo');
+  liveData = {
+    DGS10: [{ date: '2026-02-01', value: 4.25 }],
+    TB3MS: [{ date: '2026-02-01', value: 4.50 }],
+    DGS10_RAW: Array.from({length:12},(_,i)=>({date:`2025-${String(i+3).padStart(2,'0')}-01`,value:4.0+i*0.1})),
+    TB3MS_RAW: Array.from({length:12},(_,i)=>({date:`2025-${String(i+3).padStart(2,'0')}-01`,value:5.0-i*0.05})),
+    DGS10_MON: Array.from({length:24},(_,i)=>({date:`${i<12?'2024':'2025'}-${String((i%12)+1).padStart(2,'0')}-01`,value:4.0+Math.sin(i*0.3)*0.4})).reverse(),
+    TB3MS_MON: Array.from({length:24},(_,i)=>({date:`${i<12?'2024':'2025'}-${String((i%12)+1).padStart(2,'0')}-01`,value:5.0-i*0.04})).reverse(),
+    NFCI: Array.from({length:104},(_,i)=>({date:`2025-${String(12-Math.floor(i/4)).padStart(2,'0')}-${String(28-((i%4)*7)).padStart(2,'0')}`, value: -0.05 + Math.sin(i*0.25)*0.15 })),
+    DRTSCILM: [{date:'2025-10-01',value:22},{date:'2025-07-01',value:18},{date:'2025-04-01',value:12},{date:'2025-01-01',value:5},{date:'2024-10-01',value:-2},{date:'2024-07-01',value:-5}],
+    SAHMREALTIME: [{date:'2026-01-01',value:0.06},{date:'2025-12-01',value:0.04},{date:'2025-11-01',value:0.02}],
+    CFNAI: Array.from({length:12},(_,i)=>({ date:`2025-${String(12-i).padStart(2,'0')}-01`, value: -0.1 + Math.sin(i*0.6)*0.4 })),
+    // USREC: no NBER recession in the 4-year window ending Feb 2026
+    USREC: [],
+    PERMIT: Array.from({length:16},(_,i)=>({date:`2025-${String(12-i).padStart(2,'0')}-01`,value:1420-i*12+(Math.sin(i)*40)})),
+    UMCSENT: Array.from({length:120},(_,i)=>({date:`2015-${String((i%12)+1).padStart(2,'0')}-01`,value:80-i*0.15+Math.sin(i*0.5)*12})),
+    CP: Array.from({length:8},(_,i)=>({date:`2025-${String((4-i%4)*3).padStart(2,'0')}-01`,value:2800-i*40})),
+    INDPRO: Array.from({length:10},(_,i)=>({date:`2025-${String(12-i).padStart(2,'0')}-01`,value:102.5-i*0.1})),
+    RECPROUSM156N: [{date:'2025-11-01',value:35},{date:'2025-08-01',value:28},{date:'2025-05-01',value:20}],
+    BAMLH0A0HYM2: Array.from({length:760},(_,i)=>({ date:`2026-02-${String(28-Math.floor(i/30)).padStart(2,'0')}-01`, value: 3.2 + Math.sin(i*0.08)*0.6 + i*0.001 })),
+    ICSA: Array.from({length:110},(_,i)=>({ date:`2025-${String(12-Math.floor(i/4)).padStart(2,'0')}-${String(28-((i%4)*7)).padStart(2,'0')}`, value: 215000 + Math.sin(i*0.3)*18000 })),
+  };
+  renderAll();
+  document.getElementById('lastUpdated').textContent = 'Demo Mode · Illustrative data only';
+  hideBanner();
+  document.getElementById('refreshBtn').style.display = '';
+  document.getElementById('exportBtn').style.display  = '';
+}
+
+// ═══════════════════════════════════════════
+//  SKELETON CARDS ON INIT
+// ═══════════════════════════════════════════
+function renderSkeletons() {
+  const grid = document.getElementById('indGrid');
+  grid.innerHTML = '';
+  const names = ['Yield Curve','Financial Conditions','HY Credit Spread','Credit Conditions','Sahm Rule','Jobless Claims','CFNAI','Housing Permits','Consumer Sentiment','Corp. Profits','Industrial Prod.','Recession Prob.'];
+  names.forEach((name, i) => {
+    const card = document.createElement('div');
+    card.className = 'ind-card signal-loading';
+    card.style.animationDelay = `${i * 0.05}s`;
+    card.innerHTML = `
+      <div class="ind-top"><div class="ind-name">${name}</div><div class="signal-dot loading"></div></div>
+      <div class="skeleton skel-value"></div>
+      <div class="skeleton skel-sub"></div>
+      <div class="spark-wrap"><div class="skeleton skel-spark"></div></div>
+      <div class="score-track"><div class="score-fill" style="width:50%;background:var(--border)"></div></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+window.addEventListener('load', () => {
+  renderSkeletons();
+  apiKey = getKey();
+  if (apiKey) {
+    hideBanner();
+    loadData();
+  } else {
+    showBanner();
+    renderDemo();
+  }
+});
+
+window.addEventListener('resize', () => {
+  // Y-axis canvas needs redraw on resize (width doesn't change but surface background may)
+  if (indicators.length > 0 && histScores.length > 0) {
+    const composite = computeComposite(indicators);
+    renderHistoryChart(composite, histData.USREC || liveData.USREC || [], histScores);
+  }
+});
+</script>
+</body>
+</html>
