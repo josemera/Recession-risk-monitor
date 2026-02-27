@@ -834,6 +834,7 @@ function computeIndicators(data) {
       id: 2, name: 'Credit Conditions', sub: 'Net % Tightening C&I Standards',
       value: val !== null ? (val > 0 ? '+' : '') + val.toFixed(1) + '%' : '—',
       date: credit?.[0]?.date,
+      freshnessDate: offsetDateStr(credit?.[0]?.date, 60), // SLOOS released ~2mo after quarter end
       score: Math.round(score), signal,
       spark: getSparkValues(credit, 12).map(v => v !== null ? -v : null), // invert so up=good; 12 quarters = 3yrs
       sparkLabel: '12 quarters (3yr)',
@@ -932,6 +933,7 @@ function computeIndicators(data) {
       id: 7, name: 'Corporate Profits', sub: 'NIPA Profits YoY (Quarterly)',
       value: yoy !== null ? (yoy >= 0 ? '+' : '') + yoy.toFixed(1) + '%' : '—',
       date: cp?.[0]?.date,
+      freshnessDate: offsetDateStr(cp?.[0]?.date, 90), // BEA releases ~3mo after quarter end
       score: Math.round(score), signal,
       spark: getSparkValues(cp, 12), // 12 quarters = 3 years
       sparkLabel: '12 quarters (3yr)',
@@ -1123,7 +1125,7 @@ const INDICATOR_DESCRIPTIONS = {
 };
 
 const FRED_URLS = {
-  0:  'https://fred.stlouisfed.org/graph/?g=1L5k',           // Yield curve 10y-3m spread
+  0:  null,                                                    // Yield curve — no single FRED page for the spread
   1:  'https://fred.stlouisfed.org/series/NFCI',
   2:  'https://fred.stlouisfed.org/series/DRTSCILM',
   3:  'https://fred.stlouisfed.org/series/SAHMREALTIME',
@@ -1279,6 +1281,14 @@ function genSparkPath(vals, w, h) {
   return 'M ' + pts.join(' L ');
 }
 
+// Offset a YYYY-MM-DD string by N days, returns new YYYY-MM-DD or null
+function offsetDateStr(dateStr, days) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // Data freshness: returns {cls, label} based on days since last data point
 function dataFreshness(dateStr) {
   if (!dateStr || dateStr === 'manual' || dateStr === 'cached') {
@@ -1323,7 +1333,7 @@ function renderIndicators(inds) {
 
     const isManual   = ind.manual;
     const dateStr    = ind.date && ind.date !== 'manual' ? ind.date.slice(0,7) : isManual ? 'Manual' : '';
-    const fresh      = dataFreshness(ind.date);
+    const fresh      = dataFreshness(ind.freshnessDate || ind.date);
     const sparkLabel = ind.sparkLabel || '24mo trend';
 
     card.innerHTML = `
