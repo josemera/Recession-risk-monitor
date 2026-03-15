@@ -248,6 +248,21 @@ body::before{
 .chart-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);}
 .chart-legend{display:flex;gap:16px;flex-wrap:wrap;}
 .leg-item{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--text-muted);}
+.leg-item.toggleable{
+  cursor:pointer;
+  padding:4px 8px;
+  border:1px solid var(--border);
+  border-radius:4px;
+  background:transparent;
+  transition:background 0.15s,border-color 0.15s,color 0.15s,opacity 0.15s;
+  user-select:none;
+}
+.leg-item.toggleable.active{
+  background:rgba(14,17,23,0.65);
+  border-color:var(--border2);
+  color:var(--text-dim);
+}
+.leg-item.toggleable:not(.active){opacity:0.65;}
 .leg-line{width:18px;height:2px;}
 .leg-sq{width:8px;height:8px;opacity:0.4;}
 
@@ -513,11 +528,11 @@ body::before{
     <div class="chart-header">
       <div class="chart-title" id="chartTitle">Composite Risk Score — Reconstructed 1990–Present · NBER Recession Shading</div>
       <div class="chart-legend">
-        <div class="leg-item"><div class="leg-line" style="background:var(--accent)"></div><span>Recession Score</span></div>
-        <div class="leg-item" id="hardshipLegendItem" style="display:none"><div class="leg-line" style="background:var(--hardship)"></div><span>Hardship Score</span></div>
-        <div class="leg-item"><div class="leg-line" style="height:0;border-top:2px dashed rgba(79,158,255,0.55);background:none;"></div><span>Implied Rec. Prob %</span></div>
-        <div class="leg-item"><div class="leg-line" style="height:0;border-top:2px dashed var(--amber);background:none;"></div><span>Risk Threshold (50)</span></div>
-        <div class="leg-item"><div class="leg-sq" style="background:var(--red)"></div><span>Recession Zone</span></div>
+        <div class="leg-item toggleable active" id="legendRecession" onclick="toggleChartElement('recession')"><div class="leg-line" style="background:var(--accent)"></div><span>Recession Score</span></div>
+        <div class="leg-item toggleable active" id="hardshipLegendItem" style="display:none" onclick="toggleChartElement('hardship')"><div class="leg-line" style="background:var(--hardship)"></div><span>Hardship Score</span></div>
+        <div class="leg-item toggleable active" id="legendProbability" onclick="toggleChartElement('probability')"><div class="leg-line" style="height:0;border-top:2px dashed rgba(79,158,255,0.55);background:none;"></div><span>Implied Rec. Prob %</span></div>
+        <div class="leg-item toggleable active" id="legendThreshold" onclick="toggleChartElement('threshold')"><div class="leg-line" style="height:0;border-top:2px dashed var(--amber);background:none;"></div><span>Risk Threshold (50)</span></div>
+        <div class="leg-item toggleable active" id="legendRecessionZone" onclick="toggleChartElement('recessionZone')"><div class="leg-sq" style="background:var(--red)"></div><span>Recession Zone</span></div>
       </div>
     </div>
     <div class="chart-zoom-row">
@@ -641,6 +656,13 @@ let hardshipScores = [];
 let indicators = [];
 let hardshipIndicators = [];
 let currentZoomYears = 0;
+let chartVisibility = {
+  recession: true,
+  hardship: true,
+  probability: true,
+  threshold: true,
+  recessionZone: true,
+};
 
 // ── API KEY MANAGEMENT ───────────────────────────────────────────────────
 // Browser-only. Stores user's personal FRED API key in localStorage.
@@ -1200,6 +1222,29 @@ function hardshipLineColor(score) {
   return 'rgba(240,70,90,0.95)';
 }
 
+function updateLegendState() {
+  const map = {
+    recession: 'legendRecession',
+    hardship: 'hardshipLegendItem',
+    probability: 'legendProbability',
+    threshold: 'legendThreshold',
+    recessionZone: 'legendRecessionZone',
+  };
+  Object.entries(map).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const enabled = key === 'hardship' ? HARDSHIP_ENABLED && chartVisibility[key] : chartVisibility[key];
+    el.classList.toggle('active', !!enabled);
+  });
+}
+
+function toggleChartElement(key) {
+  if (key === 'hardship' && !HARDSHIP_ENABLED) return;
+  chartVisibility[key] = !chartVisibility[key];
+  updateLegendState();
+  renderChartOnly();
+}
+
 function showScoreInfo() {
   const score = parseInt(document.getElementById('compNum').textContent, 10) || 0;
   const text = [
@@ -1370,42 +1415,55 @@ function renderHistoryChart(recessionScore, usrec = [], recessionHistory = [], h
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  const recSet = new Set((usrec || []).filter(o => o.value === 1).map(o => o.date.slice(0, 7)));
-  let blockStart = null;
-  for (let i = 0; i <= N; i++) {
-    const item = plotData[Math.min(i, N - 1)];
-    const inRec = item && recSet.has(item.date.slice(0, 7));
-    const x = idxToX(i);
-    if (inRec && blockStart === null) blockStart = x - PX_PER_MONTH / 2;
-    else if (!inRec && blockStart !== null) {
-      const x2 = x - PX_PER_MONTH / 2;
-      ctx.fillStyle = 'rgba(240,70,90,0.12)';
-      ctx.fillRect(blockStart, pad.t, x2 - blockStart, ch);
-      blockStart = null;
+  if (chartVisibility.recessionZone) {
+    const recSet = new Set((usrec || []).filter(o => o.value === 1).map(o => o.date.slice(0, 7)));
+    let blockStart = null;
+    for (let i = 0; i <= N; i++) {
+      const item = plotData[Math.min(i, N - 1)];
+      const inRec = item && recSet.has(item.date.slice(0, 7));
+      const x = idxToX(i);
+      if (inRec && blockStart === null) blockStart = x - PX_PER_MONTH / 2;
+      else if (!inRec && blockStart !== null) {
+        const x2 = x - PX_PER_MONTH / 2;
+        ctx.fillStyle = 'rgba(240,70,90,0.12)';
+        ctx.fillRect(blockStart, pad.t, x2 - blockStart, ch);
+        blockStart = null;
+      }
     }
   }
-  [25, 50, 75].forEach(v => {
+  [25, 75].forEach(v => {
     ctx.strokeStyle = v === 50 ? 'rgba(245,166,35,0.2)' : 'rgba(78,106,138,0.08)';
     ctx.lineWidth = v === 50 ? 1 : 0.5;
     ctx.setLineDash(v === 50 ? [5, 5] : []);
     ctx.beginPath(); ctx.moveTo(0, toY(v)); ctx.lineTo(W, toY(v)); ctx.stroke();
     ctx.setLineDash([]);
   });
-  ctx.strokeStyle = 'rgba(79,158,255,0.45)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  plotData.forEach((p, i) => i === 0 ? ctx.moveTo(idxToX(i), toY(100 - impliedRecProb(p.recession))) : ctx.lineTo(idxToX(i), toY(100 - impliedRecProb(p.recession))));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  for (let i = 1; i < N; i++) {
-    const s0 = plotData[i - 1].recession, s1 = plotData[i].recession;
-    const avg = (s0 + s1) / 2;
-    ctx.strokeStyle = avg < 50 ? 'rgba(240,70,90,0.9)' : avg < 70 ? 'rgba(245,166,35,0.9)' : 'rgba(61,220,132,0.9)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(idxToX(i - 1), toY(s0)); ctx.lineTo(idxToX(i), toY(s1)); ctx.stroke();
+  if (chartVisibility.threshold) {
+    ctx.strokeStyle = 'rgba(245,166,35,0.2)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(0, toY(50)); ctx.lineTo(W, toY(50)); ctx.stroke();
+    ctx.setLineDash([]);
   }
-  if (HARDSHIP_ENABLED) {
+  if (chartVisibility.probability) {
+    ctx.strokeStyle = 'rgba(79,158,255,0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    plotData.forEach((p, i) => i === 0 ? ctx.moveTo(idxToX(i), toY(100 - impliedRecProb(p.recession))) : ctx.lineTo(idxToX(i), toY(100 - impliedRecProb(p.recession))));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (chartVisibility.recession) {
+    for (let i = 1; i < N; i++) {
+      const s0 = plotData[i - 1].recession, s1 = plotData[i].recession;
+      const avg = (s0 + s1) / 2;
+      ctx.strokeStyle = avg < 50 ? 'rgba(240,70,90,0.9)' : avg < 70 ? 'rgba(245,166,35,0.9)' : 'rgba(61,220,132,0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(idxToX(i - 1), toY(s0)); ctx.lineTo(idxToX(i), toY(s1)); ctx.stroke();
+    }
+  }
+  if (HARDSHIP_ENABLED && chartVisibility.hardship) {
     for (let i = 1; i < N; i++) {
       const h0 = plotData[i - 1].hardship;
       const h1 = plotData[i].hardship;
@@ -1419,9 +1477,11 @@ function renderHistoryChart(recessionScore, usrec = [], recessionHistory = [], h
     }
   }
   const last = plotData[N - 1];
-  ctx.fillStyle = recessionScore < 50 ? '#f0465a' : recessionScore < 70 ? '#f5a623' : '#3ddc84';
-  ctx.beginPath(); ctx.arc(idxToX(N - 1), toY(last.recession), 5, 0, Math.PI * 2); ctx.fill();
-  if (HARDSHIP_ENABLED && hardshipScore !== null) {
+  if (chartVisibility.recession) {
+    ctx.fillStyle = recessionScore < 50 ? '#f0465a' : recessionScore < 70 ? '#f5a623' : '#3ddc84';
+    ctx.beginPath(); ctx.arc(idxToX(N - 1), toY(last.recession), 5, 0, Math.PI * 2); ctx.fill();
+  }
+  if (HARDSHIP_ENABLED && hardshipScore !== null && chartVisibility.hardship) {
     ctx.fillStyle = hardshipLineColor(hardshipScore);
     ctx.beginPath(); ctx.arc(idxToX(N - 1), toY(last.hardship), 4, 0, Math.PI * 2); ctx.fill();
   }
@@ -1475,6 +1535,13 @@ function renderAll() {
     renderIndicators(hardshipIndicators, 'hardshipGrid', HARDSHIP_FRED_URLS);
   }
 
+  renderHistoryChart(recessionScore, histData.USREC || liveData.USREC || [], histScores, hardshipScore, hardshipScores);
+}
+
+function renderChartOnly() {
+  if (!indicators.length) return;
+  const recessionScore = computeComposite(indicators, WEIGHTS);
+  const hardshipScore = HARDSHIP_ENABLED && hardshipIndicators.length ? computeComposite(hardshipIndicators, HARDSHIP_WEIGHTS) : null;
   renderHistoryChart(recessionScore, histData.USREC || liveData.USREC || [], histScores, hardshipScore, hardshipScores);
 }
 
@@ -1559,6 +1626,7 @@ function toggleHardshipUi() {
   document.getElementById('footerScale').textContent = show
     ? 'Both composites use 0–100 scoring · > 70 = healthier · 50–70 = elevated stress · < 50 = high stress · Each weight set sums to 100%'
     : 'Composite > 70 = Low Risk · 50–70 = Elevated · < 50 = High Risk · Weights sum to 100%';
+  updateLegendState();
 }
 
 function renderDemo() {
