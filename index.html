@@ -584,11 +584,13 @@ function hideBanner() {
 
 // ═══════════════════════════════════════════
 //  CORS PROXY FETCH
-//  corsproxy.io adds correct CORS headers so fetch() works from
+//  CORS proxies add correct headers so fetch() works from
 //  file://, localhost, and any hosted origin.
-//  Falls back to a second proxy if the first fails.
+//  Tries multiple proxies in order; falls back if one fails.
 // ═══════════════════════════════════════════
 const PROXIES = [
+  url => `https://api.cors.lol/?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
 ];
