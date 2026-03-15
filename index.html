@@ -17,11 +17,11 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,600;1,300&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0e1117;
-  --surface: #161b26;
-  --surface2: #1d2535;
-  --border: #252f45;
-  --border2: #2e3d5c;
+  --bg: #090d14;
+  --surface: #121926;
+  --surface2: #182234;
+  --border: #2a3650;
+  --border2: #395173;
   --green: #3ddc84;
   --green-bg: rgba(61,220,132,0.08);
   --green-border: rgba(61,220,132,0.25);
@@ -31,10 +31,10 @@
   --red: #f0465a;
   --red-bg: rgba(240,70,90,0.08);
   --red-border: rgba(240,70,90,0.25);
-  --text: #d6e4f7;
-  --text-muted: #4e6a8a;
-  --text-dim: #8aa0c0;
-  --accent: #4f9eff;
+  --text: #e3eefc;
+  --text-muted: #6f88ab;
+  --text-dim: #a6bbd8;
+  --accent: #63abff;
   --hardship: #e05c5c;
   --mono: 'IBM Plex Mono', monospace;
   --display: 'Syne', sans-serif;
@@ -53,7 +53,7 @@ body{
 /* Subtle dot grid background */
 body::before{
   content:'';position:fixed;inset:0;
-  background-image:radial-gradient(rgba(79,158,255,0.06) 1px, transparent 1px);
+  background-image:radial-gradient(rgba(99,171,255,0.08) 1px, transparent 1px);
   background-size:28px 28px;
   pointer-events:none;z-index:0;
 }
@@ -118,6 +118,7 @@ body::before{
   display:flex;align-items:center;gap:28px;flex-wrap:wrap;
   width:100%;
   margin-bottom:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.22);
 }
 .composite-left{min-width:160px;}
 .composite-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;}
@@ -159,6 +160,20 @@ body::before{
   font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-muted);
 }
 .section-header::after{content:'';flex:1;height:1px;background:var(--border);}
+.toggle-header{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  margin-bottom:12px;
+}
+.toggle-tabs{display:flex;gap:8px;flex-wrap:wrap;}
+.toggle-tab{
+  font-family:var(--mono);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;
+  padding:8px 14px;border-radius:999px;border:1px solid var(--border2);
+  background:transparent;color:var(--text-dim);cursor:pointer;
+  transition:background 0.15s,border-color 0.15s,color 0.15s,transform 0.1s;
+}
+.toggle-tab:hover{transform:translateY(-1px);border-color:var(--accent);color:var(--text);}
+.toggle-tab.active{background:rgba(79,158,255,0.12);border-color:var(--accent);color:var(--text);}
+.toggle-panel{margin-bottom:16px;}
 
 .indicators-grid{
   display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;
@@ -171,6 +186,7 @@ body::before{
   padding:14px 16px;position:relative;overflow:hidden;
   transition:transform 0.15s, border-color 0.2s;cursor:pointer;
   animation:fadeUp 0.5s ease both;
+  box-shadow:0 8px 22px rgba(0,0,0,0.16);
 }
 .ind-card:hover{transform:translateY(-3px);}
 .ind-card.signal-red{border-top:2px solid var(--red);}
@@ -243,6 +259,7 @@ body::before{
 .chart-card{
   background:var(--surface);border:1px solid var(--border);border-radius:6px;
   padding:20px 24px;margin-bottom:16px;
+  box-shadow:0 10px 28px rgba(0,0,0,0.18);
 }
 .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
 .chart-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);}
@@ -364,10 +381,12 @@ body::before{
   .chart-zoom-row{flex-wrap:wrap;}
   .header{flex-direction:column;gap:10px;}
   .header-right{align-items:flex-start;}
+  .toggle-header{flex-direction:column;align-items:flex-start;}
 }
 .method-card{
   background:var(--surface);border:1px solid var(--border);border-radius:6px;
   padding:18px 24px;margin-bottom:16px;
+  box-shadow:0 8px 22px rgba(0,0,0,0.16);
 }
 .method-table{width:100%;border-collapse:collapse;font-size:10px;}
 .method-table th{
@@ -388,6 +407,19 @@ body::before{
   display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
   font-size:9px;color:var(--text-muted);letter-spacing:0.5px;line-height:1.8;
 }
+.legal-footer{
+  margin-top:10px;
+  padding-top:12px;
+  border-top:1px solid rgba(57,81,115,0.45);
+  font-size:9px;
+  color:var(--text-dim);
+  line-height:1.8;
+}
+.legal-footer a{
+  color:var(--accent);
+  text-decoration:none;
+}
+.legal-footer a:hover{text-decoration:underline;}
 
 /* Loading skeleton */
 .skeleton{
@@ -468,61 +500,6 @@ body::before{
     </div>
   </header>
 
-  <!-- Composite Scores -->
-  <div class="composite-card" id="compositeCard">
-    <div class="composite-left">
-      <div class="composite-label">Composite Risk Score <button class="comp-info-btn" onclick="showScoreInfo()" title="What does this score mean?">?</button></div>
-      <div class="composite-number" id="compNum">—</div>
-      <div class="composite-regime" id="compRegime">Loading…</div>
-      <div class="comp-prob" id="compProb"></div>
-    </div>
-    <div class="composite-right">
-      <div class="bar-track">
-        <div class="bar-segments">
-          <div class="seg-red"></div>
-          <div class="seg-amber"></div>
-          <div class="seg-green"></div>
-        </div>
-        <div class="bar-needle" id="barNeedle" style="left:0%"></div>
-      </div>
-      <div class="bar-labels"><span>0 · HIGH RISK</span><span>50</span><span>70</span><span>100 · LOW RISK</span></div>
-      <div class="count-row" id="countRow">
-        <span class="badge neutral">Loading indicators…</span>
-      </div>
-      <div id="lastRefreshed" style="font-size:8px;color:var(--text-muted);margin-top:8px;letter-spacing:0.5px;"></div>
-    </div>
-  </div>
-
-  <!-- Indicator Cards -->
-  <div class="section-header" id="recessionSectionHeader">Recession Risk Indicators · 12 Indicators · All FRED Data</div>
-  <div class="indicators-grid" id="indGrid"></div>
-  <div class="section-header" id="hardshipSectionHeader" style="display:none">Economic Hardship Indicators · 8 Indicators · All FRED Data</div>
-  <div class="composite-card" id="hardshipCompositeCard" style="display:none">
-    <div class="composite-left">
-      <div class="composite-label">Economic Hardship Score <button class="comp-info-btn" onclick="showHardshipScoreInfo()" title="What does this score mean?">?</button></div>
-      <div class="composite-number" id="hardshipCompNum">—</div>
-      <div class="composite-regime" id="hardshipCompRegime">Loading…</div>
-      <div class="comp-prob" id="hardshipCompProb"></div>
-      <div class="comp-note" id="hardshipCompNote"></div>
-    </div>
-    <div class="composite-right">
-      <div class="bar-track">
-        <div class="bar-segments">
-          <div class="seg-red"></div>
-          <div class="seg-amber"></div>
-          <div class="seg-green"></div>
-        </div>
-        <div class="bar-needle" id="hardshipBarNeedle" style="left:0%"></div>
-      </div>
-      <div class="bar-labels"><span>0 · HIGH HARDSHIP</span><span>50</span><span>70</span><span>100 · LOW HARDSHIP</span></div>
-      <div class="count-row" id="hardshipCountRow">
-        <span class="badge neutral">Loading hardship indicators…</span>
-      </div>
-      <div id="hardshipLastRefreshed" style="font-size:8px;color:var(--text-muted);margin-top:8px;letter-spacing:0.5px;"></div>
-    </div>
-  </div>
-  <div class="indicators-grid" id="hardshipGrid" style="display:none"></div>
-
   <div class="section-header">Reconstructed Composite History (1990–Present) · NBER Recession Bands · FRED Data</div>
   <div class="chart-card">
     <div class="chart-header">
@@ -553,47 +530,111 @@ body::before{
     <div class="chart-hover-tip" id="chartHoverTip"></div>
   </div>
 
-  <!-- Methodology -->
-  <div class="section-header">Weights & Signal Logic</div>
-  <div class="method-card" id="recessionMethodCard">
-    <table class="method-table" id="recessionMethodTable">
-      <thead><tr><th>Indicator</th><th>FRED Series</th><th>Weight</th><th>Green</th><th>Amber</th><th>Red</th></tr></thead>
-      <tbody>
-        <tr><td>Yield Curve (10y–3m)</td><td>DGS10 − TB3MS</td><td class="wt">18%</td><td>> +1.0%</td><td>0–1%</td><td>< 0% (inverted)</td></tr>
-        <tr><td>Financial Conditions (NFCI)</td><td>NFCI</td><td class="wt">13%</td><td>< 0 (loose)</td><td>0–0.5</td><td>> 0.5 (stress)</td></tr>
-        <tr><td>HY Credit Spread</td><td>BAMLH0A0HYM2</td><td class="wt">8%</td><td>< 4%</td><td>4–7%</td><td>> 7% (stress)</td></tr>
-        <tr><td>Credit Conditions</td><td>DRTSCILM</td><td class="wt">8%</td><td>< 0 (easing)</td><td>0–20 net tightening</td><td>> 20 tightening</td></tr>
-        <tr><td>Sahm Rule (Real-time)</td><td>SAHMREALTIME</td><td class="wt">9%</td><td>< 0.10</td><td>0.10–0.50</td><td>≥ 0.50</td></tr>
-        <tr><td>Jobless Claims (4wk avg)</td><td>ICSA</td><td class="wt">7%</td><td>< 250k</td><td>250–400k</td><td>> 400k</td></tr>
-        <tr><td>CFNAI (Chicago Fed Activity)</td><td>CFNAI</td><td class="wt">9%</td><td>> 0</td><td>−0.7 to 0</td><td>< −0.7 recession threshold</td></tr>
-        <tr><td>Housing Permits YoY</td><td>PERMIT</td><td class="wt">8%</td><td>> 0%</td><td>−10% to 0%</td><td>< −10%</td></tr>
-        <tr><td>Consumer Sentiment z-score</td><td>UMCSENT</td><td class="wt">6%</td><td>> 0σ</td><td>−1σ to 0σ</td><td>< −1σ</td></tr>
-        <tr><td>Corporate Profits YoY</td><td>CP</td><td class="wt">6%</td><td>> 0%</td><td>−5% to 0%</td><td>< −5%</td></tr>
-        <tr><td>Industrial Production 6mo</td><td>INDPRO</td><td class="wt">4%</td><td>≥ 0%</td><td>−1% to 0%</td><td>< −1%</td></tr>
-        <tr><td>Recession Probability</td><td>RECPROUSM156N</td><td class="wt">4%</td><td>< 20%</td><td>20–40%</td><td>> 40%</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="section-header" id="hardshipMethodHeader" style="display:none">Economic Hardship Indicators · Weights & Signal Logic</div>
-  <div class="method-card" id="hardshipMethodCard" style="display:none">
-    <table class="method-table" id="hardshipMethodTable">
-      <thead><tr><th>Indicator</th><th>FRED Series</th><th>Weight</th><th>Green</th><th>Amber</th><th>Red</th></tr></thead>
-      <tbody>
-        <tr><td>Real Personal Income ex-Transfers</td><td>W875RX1</td><td class="wt">16%</td><td>> +1%</td><td>−1% to +1%</td><td>< −1%</td></tr>
-        <tr><td>Personal Saving Rate</td><td>PSAVERT</td><td class="wt">12%</td><td>> 7%</td><td>4–7%</td><td>< 4%</td></tr>
-        <tr><td>Part-Time for Economic Reasons</td><td>LNS12032194</td><td class="wt">14%</td><td>< 4,000k</td><td>4,000–6,000k</td><td>> 6,000k</td></tr>
-        <tr><td>Credit Card Delinquency Rate</td><td>DRCCLACBS</td><td class="wt">13%</td><td>< 2.5%</td><td>2.5–5%</td><td>> 5%</td></tr>
-        <tr><td>Real Retail Sales YoY</td><td>RSXFS</td><td class="wt">14%</td><td>> +2%</td><td>−2% to +2%</td><td>< −2%</td></tr>
-        <tr><td>Labor Force Participation Rate</td><td>CIVPART</td><td class="wt">12%</td><td>> 63.5%</td><td>62–63.5%</td><td>< 62%</td></tr>
-        <tr><td>Consumer Sentiment z-score (Hardship)</td><td>UMCSENT</td><td class="wt">10%</td><td>> 0σ</td><td>−1σ to 0σ</td><td>< −1σ</td></tr>
-        <tr><td>Real Median Weekly Earnings YoY</td><td>LES1252881600Q</td><td class="wt">9%</td><td>> +1%</td><td>−1% to +1%</td><td>< −1%</td></tr>
-      </tbody>
-    </table>
+  <div class="toggle-panel">
+    <div class="toggle-header">
+      <div class="section-header" id="activeSectionHeader">Recession Risk · Composite, Indicators & Signal Logic</div>
+      <div class="toggle-tabs">
+        <button class="toggle-tab active" id="contentTabRecession" onclick="setActiveContentSection('recession')">Recession Risk</button>
+        <button class="toggle-tab" id="contentTabHardship" onclick="setActiveContentSection('hardship')">Economic Hardship</button>
+      </div>
+    </div>
+
+    <div class="composite-card" id="compositeCard">
+      <div class="composite-left">
+        <div class="composite-label">Composite Risk Score <button class="comp-info-btn" onclick="showScoreInfo()" title="What does this score mean?">?</button></div>
+        <div class="composite-number" id="compNum">—</div>
+        <div class="composite-regime" id="compRegime">Loading…</div>
+        <div class="comp-prob" id="compProb"></div>
+      </div>
+      <div class="composite-right">
+        <div class="bar-track">
+          <div class="bar-segments">
+            <div class="seg-red"></div>
+            <div class="seg-amber"></div>
+            <div class="seg-green"></div>
+          </div>
+          <div class="bar-needle" id="barNeedle" style="left:0%"></div>
+        </div>
+        <div class="bar-labels"><span>0 · HIGH RISK</span><span>50</span><span>70</span><span>100 · LOW RISK</span></div>
+        <div class="count-row" id="countRow">
+          <span class="badge neutral">Loading indicators…</span>
+        </div>
+        <div id="lastRefreshed" style="font-size:8px;color:var(--text-muted);margin-top:8px;letter-spacing:0.5px;"></div>
+      </div>
+    </div>
+
+    <div class="composite-card" id="hardshipCompositeCard" style="display:none">
+      <div class="composite-left">
+        <div class="composite-label">Economic Hardship Score <button class="comp-info-btn" onclick="showHardshipScoreInfo()" title="What does this score mean?">?</button></div>
+        <div class="composite-number" id="hardshipCompNum">—</div>
+        <div class="composite-regime" id="hardshipCompRegime">Loading…</div>
+        <div class="comp-prob" id="hardshipCompProb"></div>
+        <div class="comp-note" id="hardshipCompNote"></div>
+      </div>
+      <div class="composite-right">
+        <div class="bar-track">
+          <div class="bar-segments">
+            <div class="seg-red"></div>
+            <div class="seg-amber"></div>
+            <div class="seg-green"></div>
+          </div>
+          <div class="bar-needle" id="hardshipBarNeedle" style="left:0%"></div>
+        </div>
+        <div class="bar-labels"><span>0 · HIGH HARDSHIP</span><span>50</span><span>70</span><span>100 · LOW HARDSHIP</span></div>
+        <div class="count-row" id="hardshipCountRow">
+          <span class="badge neutral">Loading hardship indicators…</span>
+        </div>
+        <div id="hardshipLastRefreshed" style="font-size:8px;color:var(--text-muted);margin-top:8px;letter-spacing:0.5px;"></div>
+      </div>
+    </div>
+
+    <div class="indicators-grid" id="indGrid"></div>
+    <div class="indicators-grid" id="hardshipGrid" style="display:none"></div>
+
+    <div class="method-card" id="recessionMethodCard">
+      <table class="method-table" id="recessionMethodTable">
+        <thead><tr><th>Indicator</th><th>FRED Series</th><th>Weight</th><th>Green</th><th>Amber</th><th>Red</th></tr></thead>
+        <tbody>
+          <tr><td>Yield Curve (10y–3m)</td><td>DGS10 − TB3MS</td><td class="wt">18%</td><td>> +1.0%</td><td>0–1%</td><td>< 0% (inverted)</td></tr>
+          <tr><td>Financial Conditions (NFCI)</td><td>NFCI</td><td class="wt">13%</td><td>< 0 (loose)</td><td>0–0.5</td><td>> 0.5 (stress)</td></tr>
+          <tr><td>HY Credit Spread</td><td>BAMLH0A0HYM2</td><td class="wt">8%</td><td>< 4%</td><td>4–7%</td><td>> 7% (stress)</td></tr>
+          <tr><td>Credit Conditions</td><td>DRTSCILM</td><td class="wt">8%</td><td>< 0 (easing)</td><td>0–20 net tightening</td><td>> 20 tightening</td></tr>
+          <tr><td>Sahm Rule (Real-time)</td><td>SAHMREALTIME</td><td class="wt">9%</td><td>< 0.10</td><td>0.10–0.50</td><td>≥ 0.50</td></tr>
+          <tr><td>Jobless Claims (4wk avg)</td><td>ICSA</td><td class="wt">7%</td><td>< 250k</td><td>250–400k</td><td>> 400k</td></tr>
+          <tr><td>CFNAI (Chicago Fed Activity)</td><td>CFNAI</td><td class="wt">9%</td><td>> 0</td><td>−0.7 to 0</td><td>< −0.7 recession threshold</td></tr>
+          <tr><td>Housing Permits YoY</td><td>PERMIT</td><td class="wt">8%</td><td>> 0%</td><td>−10% to 0%</td><td>< −10%</td></tr>
+          <tr><td>Consumer Sentiment z-score</td><td>UMCSENT</td><td class="wt">6%</td><td>> 0σ</td><td>−1σ to 0σ</td><td>< −1σ</td></tr>
+          <tr><td>Corporate Profits YoY</td><td>CP</td><td class="wt">6%</td><td>> 0%</td><td>−5% to 0%</td><td>< −5%</td></tr>
+          <tr><td>Industrial Production 6mo</td><td>INDPRO</td><td class="wt">4%</td><td>≥ 0%</td><td>−1% to 0%</td><td>< −1%</td></tr>
+          <tr><td>Recession Probability</td><td>RECPROUSM156N</td><td class="wt">4%</td><td>< 20%</td><td>20–40%</td><td>> 40%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="method-card" id="hardshipMethodCard" style="display:none">
+      <table class="method-table" id="hardshipMethodTable">
+        <thead><tr><th>Indicator</th><th>FRED Series</th><th>Weight</th><th>Green</th><th>Amber</th><th>Red</th></tr></thead>
+        <tbody>
+          <tr><td>Real Personal Income ex-Transfers</td><td>W875RX1</td><td class="wt">16%</td><td>> +1%</td><td>−1% to +1%</td><td>< −1%</td></tr>
+          <tr><td>Personal Saving Rate</td><td>PSAVERT</td><td class="wt">12%</td><td>> 7%</td><td>4–7%</td><td>< 4%</td></tr>
+          <tr><td>Part-Time for Economic Reasons</td><td>LNS12032194</td><td class="wt">14%</td><td>< 4,000k</td><td>4,000–6,000k</td><td>> 6,000k</td></tr>
+          <tr><td>Credit Card Delinquency Rate</td><td>DRCCLACBS</td><td class="wt">13%</td><td>< 2.5%</td><td>2.5–5%</td><td>> 5%</td></tr>
+          <tr><td>Real Retail Sales YoY</td><td>RSXFS</td><td class="wt">14%</td><td>> +2%</td><td>−2% to +2%</td><td>< −2%</td></tr>
+          <tr><td>Labor Force Participation Rate</td><td>CIVPART</td><td class="wt">12%</td><td>> 63.5%</td><td>62–63.5%</td><td>< 62%</td></tr>
+          <tr><td>Consumer Sentiment z-score (Hardship)</td><td>UMCSENT</td><td class="wt">10%</td><td>> 0σ</td><td>−1σ to 0σ</td><td>< −1σ</td></tr>
+          <tr><td>Real Median Weekly Earnings YoY</td><td>LES1252881600Q</td><td class="wt">9%</td><td>> +1%</td><td>−1% to +1%</td><td>< −1%</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="footer">
     <div id="footerData">Data: St. Louis Federal Reserve FRED API · Recession composite: 12 indicators · Hardship composite: 8 indicators when enabled</div>
     <div id="footerScale">Both composites use 0–100 scoring · > 70 = healthier · 50–70 = elevated stress · < 50 = high stress · Each weight set sums to 100%</div>
+  </div>
+  <div class="legal-footer">
+    <div>Source: U.S. Federal Reserve Economic Data (FRED), Federal Reserve Bank of St. Louis · <a href="https://fred.stlouisfed.org" target="_blank" rel="noopener">fred.stlouisfed.org</a></div>
+    <div>This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. Terms: <a href="https://fred.stlouisfed.org/docs/api/terms_of_use.html" target="_blank" rel="noopener">FRED API Terms of Use</a></div>
+    <div>Some series may incorporate third-party data providers with their own copyright or reuse restrictions. Review the source notes on the corresponding FRED series page before redistribution.</div>
   </div>
 </div>
 
@@ -656,6 +697,7 @@ let hardshipScores = [];
 let indicators = [];
 let hardshipIndicators = [];
 let currentZoomYears = 0;
+let currentContentSection = 'recession';
 let chartVisibility = {
   recession: true,
   hardship: true,
@@ -1245,6 +1287,23 @@ function toggleChartElement(key) {
   renderChartOnly();
 }
 
+function setActiveContentSection(section) {
+  if (section === 'hardship' && !HARDSHIP_ENABLED) section = 'recession';
+  currentContentSection = section;
+  const recessionActive = section === 'recession';
+  document.getElementById('contentTabRecession').classList.toggle('active', recessionActive);
+  document.getElementById('contentTabHardship').classList.toggle('active', !recessionActive && HARDSHIP_ENABLED);
+  document.getElementById('compositeCard').style.display = recessionActive ? '' : 'none';
+  document.getElementById('indGrid').style.display = recessionActive ? 'grid' : 'none';
+  document.getElementById('recessionMethodCard').style.display = recessionActive ? '' : 'none';
+  document.getElementById('hardshipCompositeCard').style.display = !recessionActive && HARDSHIP_ENABLED ? '' : 'none';
+  document.getElementById('hardshipGrid').style.display = !recessionActive && HARDSHIP_ENABLED ? 'grid' : 'none';
+  document.getElementById('hardshipMethodCard').style.display = !recessionActive && HARDSHIP_ENABLED ? '' : 'none';
+  document.getElementById('activeSectionHeader').textContent = recessionActive
+    ? 'Recession Risk · Composite, Indicators & Signal Logic'
+    : 'Economic Hardship · Composite, Indicators & Signal Logic';
+}
+
 function showScoreInfo() {
   const score = parseInt(document.getElementById('compNum').textContent, 10) || 0;
   const text = [
@@ -1605,18 +1664,11 @@ async function loadHistory() {
 
 function toggleHardshipUi() {
   const show = !!HARDSHIP_ENABLED;
-  document.getElementById('hardshipCompositeCard').style.display = show ? '' : 'none';
-  document.getElementById('hardshipSectionHeader').style.display = show ? '' : 'none';
-  document.getElementById('hardshipGrid').style.display = show ? 'grid' : 'none';
   document.getElementById('hardshipLegendItem').style.display = show ? 'flex' : 'none';
-  document.getElementById('hardshipMethodHeader').style.display = show ? '' : 'none';
-  document.getElementById('hardshipMethodCard').style.display = show ? '' : 'none';
+  document.getElementById('contentTabHardship').style.display = show ? '' : 'none';
   document.getElementById('headerSub').textContent = show
     ? 'Recession + Hardship Composites · FRED Live Data · Reconstructed History · 12-Month Forward Horizon'
     : '12-Indicator Composite · FRED Live Data · Reconstructed History · 12-Month Forward Horizon';
-  document.getElementById('recessionSectionHeader').textContent = show
-    ? 'Recession Risk Indicators · 12 Indicators · All FRED Data'
-    : 'Indicator Detail · 12 Indicators · All FRED Data';
   document.getElementById('bannerCopy').innerHTML = show
     ? 'Free key from <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" class="key-link">fred.stlouisfed.org</a> — takes 30 seconds · All recession and hardship indicators + full historical chart use FRED only'
     : 'Free key from <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" class="key-link">fred.stlouisfed.org</a> — takes 30 seconds · All 12 indicators + full historical chart use FRED only';
@@ -1626,6 +1678,8 @@ function toggleHardshipUi() {
   document.getElementById('footerScale').textContent = show
     ? 'Both composites use 0–100 scoring · > 70 = healthier · 50–70 = elevated stress · < 50 = high stress · Each weight set sums to 100%'
     : 'Composite > 70 = Low Risk · 50–70 = Elevated · < 50 = High Risk · Weights sum to 100%';
+  if (!show && currentContentSection === 'hardship') currentContentSection = 'recession';
+  setActiveContentSection(currentContentSection);
   updateLegendState();
 }
 
