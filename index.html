@@ -839,6 +839,34 @@ function offsetDateStr(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
+function hardshipFreshnessDate(seriesId, observationDate) {
+  if (!observationDate) return null;
+  const offsets = {
+    W875RX1: 55,
+    PSAVERT: 55,
+    LNS12032194: 34,
+    DRCCLACBS: 60,
+    RSXFS: 45,
+    CIVPART: 34,
+    UMCSENT: 55,
+    LES1252881600Q: 45,
+  };
+  return offsetDateStr(observationDate, offsets[seriesId] || 0);
+}
+
+function recessionFreshnessDate(seriesId, observationDate) {
+  if (!observationDate) return null;
+  const offsets = {
+    SAHMREALTIME: 34,
+    CFNAI: 52,
+    PERMIT: 45,
+    UMCSENT: 55,
+    INDPRO: 45,
+    RECPROUSM156N: 55,
+  };
+  return offsetDateStr(observationDate, offsets[seriesId] || 0);
+}
+
 function getWindowBefore(arr, dateStr, n) {
   if (!arr) return [];
   return arr.filter(o => o.date <= dateStr).slice(0, n).map(o => o.value);
@@ -915,13 +943,13 @@ function computeIndicators(data) {
   try {
     const val = getVal(data.SAHMREALTIME);
     const score = val !== null ? scoreLinear(-val, -0.6, 0.1) : 50;
-    inds.push({ id: 3, name: 'Sahm Rule', sub: 'Real-Time Recession Indicator', value: val !== null ? val.toFixed(2) : '—', date: data.SAHMREALTIME?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.SAHMREALTIME, 24).map(v => v !== null ? -v : null), tip: `< 0.10 → green · 0.10–0.50 → amber · ≥ 0.50 → red (recession signal)\nSahm Rule real-time estimate.`, weight: '9%', liveSource: 'FRED: SAHMREALTIME' });
+    inds.push({ id: 3, name: 'Sahm Rule', sub: 'Real-Time Recession Indicator', value: val !== null ? val.toFixed(2) : '—', date: data.SAHMREALTIME?.[0]?.date, freshnessDate: recessionFreshnessDate('SAHMREALTIME', data.SAHMREALTIME?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.SAHMREALTIME, 24).map(v => v !== null ? -v : null), tip: `< 0.10 → green · 0.10–0.50 → amber · ≥ 0.50 → red (recession signal)\nSahm Rule real-time estimate.`, weight: '9%', liveSource: 'FRED: SAHMREALTIME' });
   } catch (e) { inds.push(errorInd(3, 'Sahm Rule', 'Real-Time Indicator', '9%')); }
 
   try {
     const val = getVal(data.CFNAI);
     const score = val !== null ? scoreLinear(val, -2.0, 0.5) : 50;
-    inds.push({ id: 4, name: 'CFNAI', sub: 'Chicago Fed Activity Index', value: val !== null ? val.toFixed(2) : '—', date: data.CFNAI?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.CFNAI, 24), tip: `> 0 above trend → green · −0.7 to 0 → amber · < −0.7 recession threshold → red\nChicago Fed National Activity Index.`, weight: '9%', liveSource: 'FRED: CFNAI' });
+    inds.push({ id: 4, name: 'CFNAI', sub: 'Chicago Fed Activity Index', value: val !== null ? val.toFixed(2) : '—', date: data.CFNAI?.[0]?.date, freshnessDate: recessionFreshnessDate('CFNAI', data.CFNAI?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.CFNAI, 24), tip: `> 0 above trend → green · −0.7 to 0 → amber · < −0.7 recession threshold → red\nChicago Fed National Activity Index.`, weight: '9%', liveSource: 'FRED: CFNAI' });
   } catch (e) { inds.push(errorInd(4, 'CFNAI', 'Chicago Fed Activity Index', '9%')); }
 
   try {
@@ -929,7 +957,7 @@ function computeIndicators(data) {
     const yearAgo = data.PERMIT?.[12]?.value ?? null;
     const yoy = current && yearAgo ? (current / yearAgo - 1) * 100 : null;
     const score = yoy !== null ? scoreLinear(yoy, -20, 15) : 50;
-    inds.push({ id: 5, name: 'Housing Permits', sub: 'Year-over-Year Change', value: yoy !== null ? `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}%` : '—', date: data.PERMIT?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.PERMIT, 24), tip: `YoY > 0% → green · −10–0% → amber · < −10% trending down → red\nBuilding permits for new housing units.`, weight: '8%', liveSource: 'FRED: PERMIT' });
+    inds.push({ id: 5, name: 'Housing Permits', sub: 'Year-over-Year Change', value: yoy !== null ? `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}%` : '—', date: data.PERMIT?.[0]?.date, freshnessDate: recessionFreshnessDate('PERMIT', data.PERMIT?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.PERMIT, 24), tip: `YoY > 0% → green · −10–0% → amber · < −10% trending down → red\nBuilding permits for new housing units.`, weight: '8%', liveSource: 'FRED: PERMIT' });
   } catch (e) { inds.push(errorInd(5, 'Housing Permits', 'YoY Change', '8%')); }
 
   try {
@@ -939,7 +967,7 @@ function computeIndicators(data) {
     const std = Math.sqrt(vals.map(v => (v - mean) ** 2).reduce((a, b) => a + b, 0) / vals.length);
     const z = std > 0 ? (vals[0] - mean) / std : 0;
     const score = scoreLinear(z, -2.5, 1.5);
-    inds.push({ id: 6, name: 'Consumer Sentiment', sub: 'UMich Index (z-score)', value: `${z >= 0 ? '+' : ''}${z.toFixed(2)}σ`, date: data.UMCSENT?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.UMCSENT, 24), tip: `z > 0 → green · −1σ to 0 → amber · < −1σ → red\nUniversity of Michigan Consumer Sentiment vs 10yr history.`, weight: '6%', liveSource: 'FRED: UMCSENT' });
+    inds.push({ id: 6, name: 'Consumer Sentiment', sub: 'UMich Index (z-score)', value: `${z >= 0 ? '+' : ''}${z.toFixed(2)}σ`, date: data.UMCSENT?.[0]?.date, freshnessDate: recessionFreshnessDate('UMCSENT', data.UMCSENT?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.UMCSENT, 24), tip: `z > 0 → green · −1σ to 0 → amber · < −1σ → red\nUniversity of Michigan Consumer Sentiment vs 10yr history.`, weight: '6%', liveSource: 'FRED: UMCSENT' });
   } catch (e) { inds.push(errorInd(6, 'Consumer Sentiment', 'UMich z-score', '6%')); }
 
   try {
@@ -955,13 +983,13 @@ function computeIndicators(data) {
     const sixAgo = data.INDPRO?.[6]?.value ?? null;
     const change = current && sixAgo ? (current / sixAgo - 1) * 100 : null;
     const score = change !== null ? scoreLinear(change, -4, 3) : 50;
-    inds.push({ id: 8, name: 'Industrial Production', sub: '6-Month Change', value: change !== null ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : '—', date: data.INDPRO?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.INDPRO, 24), tip: `6mo ≥ 0% → green · −1–0% → amber · < −1% → red\nKey NBER coincident indicator.`, weight: '4%', liveSource: 'FRED: INDPRO' });
+    inds.push({ id: 8, name: 'Industrial Production', sub: '6-Month Change', value: change !== null ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : '—', date: data.INDPRO?.[0]?.date, freshnessDate: recessionFreshnessDate('INDPRO', data.INDPRO?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.INDPRO, 24), tip: `6mo ≥ 0% → green · −1–0% → amber · < −1% → red\nKey NBER coincident indicator.`, weight: '4%', liveSource: 'FRED: INDPRO' });
   } catch (e) { inds.push(errorInd(8, 'Industrial Production', '6-Month Change', '4%')); }
 
   try {
     const val = getVal(data.RECPROUSM156N);
     const score = val !== null ? scoreLinear(-val, -80, 15) : 50;
-    inds.push({ id: 9, name: 'Recession Probability', sub: 'NY Fed Model (12-Month)', value: val !== null ? `${val.toFixed(1)}%` : '—', date: data.RECPROUSM156N?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.RECPROUSM156N, 24), tip: `< 20% → green · 20–40% → amber · > 40% → red\nNY Fed 12-month ahead recession probability model.`, weight: '4%', liveSource: 'FRED: RECPROUSM156N' });
+    inds.push({ id: 9, name: 'Recession Probability', sub: 'NY Fed Model (12-Month)', value: val !== null ? `${val.toFixed(1)}%` : '—', date: data.RECPROUSM156N?.[0]?.date, freshnessDate: recessionFreshnessDate('RECPROUSM156N', data.RECPROUSM156N?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.RECPROUSM156N, 24), tip: `< 20% → green · 20–40% → amber · > 40% → red\nNY Fed 12-month ahead recession probability model.`, weight: '4%', liveSource: 'FRED: RECPROUSM156N' });
   } catch (e) { inds.push(errorInd(9, 'Recession Probability', 'NY Fed 12-Month', '4%')); }
 
   try {
@@ -986,34 +1014,34 @@ function computeHardshipIndicators(data) {
     const yearAgo = data.W875RX1?.[12]?.value ?? null;
     const yoy = current && yearAgo ? (current / yearAgo - 1) * 100 : null;
     const score = yoy !== null ? scoreLinear(yoy, -5, 5) : 50;
-    inds.push({ id: 100, name: 'Real Personal Income ex-Transfers', sub: 'Year-over-Year Change', value: yoy !== null ? `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}%` : '—', date: data.W875RX1?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.W875RX1, 24), tip: `YoY > 1% → green · −1–1% → amber · < −1% → red\nReal personal income excluding government transfers.\nOne of the four series NBER weights most heavily when dating recessions.`, weight: '16%', liveSource: 'FRED: W875RX1' });
+    inds.push({ id: 100, name: 'Real Personal Income ex-Transfers', sub: 'Year-over-Year Change', value: yoy !== null ? `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}%` : '—', date: data.W875RX1?.[0]?.date, freshnessDate: hardshipFreshnessDate('W875RX1', data.W875RX1?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.W875RX1, 24), tip: `YoY > 1% → green · −1–1% → amber · < −1% → red\nReal personal income excluding government transfers.\nOne of the four series NBER weights most heavily when dating recessions.`, weight: '16%', liveSource: 'FRED: W875RX1' });
   } catch (e) { inds.push(errorInd(100, 'Real Personal Income ex-Transfers', 'Year-over-Year Change', '16%')); }
   try {
     const val = getVal(data.PSAVERT);
     const score = val !== null ? scoreLinear(val, 2, 10) : 50;
-    inds.push({ id: 101, name: 'Personal Saving Rate', sub: 'Share of Disposable Income Saved', value: val !== null ? `${val.toFixed(1)}%` : '—', date: data.PSAVERT?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.PSAVERT, 24), tip: `> 7% → green · 4–7% → amber · < 4% depleting savings → red\nPersonal saving as % of disposable income.\nLow or falling saving rate signals households under financial stress.`, weight: '12%', liveSource: 'FRED: PSAVERT' });
+    inds.push({ id: 101, name: 'Personal Saving Rate', sub: 'Share of Disposable Income Saved', value: val !== null ? `${val.toFixed(1)}%` : '—', date: data.PSAVERT?.[0]?.date, freshnessDate: hardshipFreshnessDate('PSAVERT', data.PSAVERT?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.PSAVERT, 24), tip: `> 7% → green · 4–7% → amber · < 4% depleting savings → red\nPersonal saving as % of disposable income.\nLow or falling saving rate signals households under financial stress.`, weight: '12%', liveSource: 'FRED: PSAVERT' });
   } catch (e) { inds.push(errorInd(101, 'Personal Saving Rate', 'Share of Disposable Income Saved', '12%')); }
   try {
     const val = getVal(data.LNS12032194);
     const score = val !== null ? scoreLinear(-val, -10000, -3000) : 50;
-    inds.push({ id: 102, name: 'Part-Time for Economic Reasons', sub: 'Workers Wanting Full-Time Jobs', value: val !== null ? `${Math.round(val).toLocaleString()}k` : '—', date: data.LNS12032194?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.LNS12032194, 24).map(v => v !== null ? -v : null), tip: `< 4,000k → green · 4–6,000k → amber · > 6,000k → red\nPersons working part-time who want full-time work.\nRises before official unemployment — captures hidden labour market stress.`, weight: '14%', liveSource: 'FRED: LNS12032194' });
+    inds.push({ id: 102, name: 'Part-Time for Economic Reasons', sub: 'Workers Wanting Full-Time Jobs', value: val !== null ? `${Math.round(val).toLocaleString()}k` : '—', date: data.LNS12032194?.[0]?.date, freshnessDate: hardshipFreshnessDate('LNS12032194', data.LNS12032194?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.LNS12032194, 24).map(v => v !== null ? -v : null), tip: `< 4,000k → green · 4–6,000k → amber · > 6,000k → red\nPersons working part-time who want full-time work.\nRises before official unemployment — captures hidden labour market stress.`, weight: '14%', liveSource: 'FRED: LNS12032194' });
   } catch (e) { inds.push(errorInd(102, 'Part-Time for Economic Reasons', 'Workers Wanting Full-Time Jobs', '14%')); }
   try {
     const val = getVal(data.DRCCLACBS);
     const score = val !== null ? scoreLinear(-val, -10, -1) : 50;
-    inds.push({ id: 103, name: 'Credit Card Delinquency Rate', sub: 'Commercial Bank Delinquencies', value: val !== null ? `${val.toFixed(2)}%` : '—', date: data.DRCCLACBS?.[0]?.date, freshnessDate: offsetDateStr(data.DRCCLACBS?.[0]?.date, 60), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.DRCCLACBS, 12), sparkLabel: '12 quarters (3yr)', tip: `< 2.5% → green · 2.5–5% → amber · > 5% household stress → red\nCredit card delinquency rate at commercial banks.\nRises when households can no longer service debt — lags income stress by 1–2 quarters.`, weight: '13%', liveSource: 'FRED: DRCCLACBS' });
+    inds.push({ id: 103, name: 'Credit Card Delinquency Rate', sub: 'Commercial Bank Delinquencies', value: val !== null ? `${val.toFixed(2)}%` : '—', date: data.DRCCLACBS?.[0]?.date, freshnessDate: hardshipFreshnessDate('DRCCLACBS', data.DRCCLACBS?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.DRCCLACBS, 12), sparkLabel: '12 quarters (3yr)', tip: `< 2.5% → green · 2.5–5% → amber · > 5% household stress → red\nCredit card delinquency rate at commercial banks.\nRises when households can no longer service debt — lags income stress by 1–2 quarters.`, weight: '13%', liveSource: 'FRED: DRCCLACBS' });
   } catch (e) { inds.push(errorInd(103, 'Credit Card Delinquency Rate', 'Commercial Bank Delinquencies', '13%')); }
   try {
     const current = getVal(data.RSXFS);
     const yearAgo = data.RSXFS?.[12]?.value ?? null;
     const yoy = current && yearAgo ? (current / yearAgo - 1) * 100 : null;
     const score = yoy !== null ? scoreLinear(yoy, -8, 6) : 50;
-    inds.push({ id: 104, name: 'Real Retail Sales YoY', sub: 'Inflation-Adjusted Sales Growth', value: yoy !== null ? `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}%` : '—', date: data.RSXFS?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.RSXFS, 24), tip: `YoY > 2% → green · −2–2% → amber · < −2% → red\nRetail sales adjusted for inflation.\nDirect measure of real consumer purchasing power.`, weight: '14%', liveSource: 'FRED: RSXFS' });
+    inds.push({ id: 104, name: 'Real Retail Sales YoY', sub: 'Inflation-Adjusted Sales Growth', value: yoy !== null ? `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}%` : '—', date: data.RSXFS?.[0]?.date, freshnessDate: hardshipFreshnessDate('RSXFS', data.RSXFS?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.RSXFS, 24), tip: `YoY > 2% → green · −2–2% → amber · < −2% → red\nRetail sales adjusted for inflation.\nDirect measure of real consumer purchasing power.`, weight: '14%', liveSource: 'FRED: RSXFS' });
   } catch (e) { inds.push(errorInd(104, 'Real Retail Sales YoY', 'Inflation-Adjusted Sales Growth', '14%')); }
   try {
     const val = getVal(data.CIVPART);
     const score = val !== null ? scoreLinear(val, 60, 68) : 50;
-    inds.push({ id: 105, name: 'Labor Force Participation Rate', sub: 'Working-Age Participation', value: val !== null ? `${val.toFixed(1)}%` : '—', date: data.CIVPART?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.CIVPART, 24), tip: `> 63.5% → green · 62–63.5% → amber · < 62% → red\nShare of working-age population employed or actively seeking work.\nDeclines when discouraged workers stop looking — hidden unemployment.`, weight: '12%', liveSource: 'FRED: CIVPART' });
+    inds.push({ id: 105, name: 'Labor Force Participation Rate', sub: 'Working-Age Participation', value: val !== null ? `${val.toFixed(1)}%` : '—', date: data.CIVPART?.[0]?.date, freshnessDate: hardshipFreshnessDate('CIVPART', data.CIVPART?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.CIVPART, 24), tip: `> 63.5% → green · 62–63.5% → amber · < 62% → red\nShare of working-age population employed or actively seeking work.\nDeclines when discouraged workers stop looking — hidden unemployment.`, weight: '12%', liveSource: 'FRED: CIVPART' });
   } catch (e) { inds.push(errorInd(105, 'Labor Force Participation Rate', 'Working-Age Participation', '12%')); }
   try {
     const vals = (data.UMCSENT || []).map(o => o.value);
@@ -1022,14 +1050,14 @@ function computeHardshipIndicators(data) {
     const std = Math.sqrt(vals.map(v => (v - mean) ** 2).reduce((a, b) => a + b, 0) / vals.length);
     const z = std > 0 ? (vals[0] - mean) / std : 0;
     const score = scoreLinear(z, -2.5, 1.5);
-    inds.push({ id: 106, name: 'Consumer Sentiment', sub: 'UMich Index (z-score)', sharedLabel: '(shared signal)', value: `${z >= 0 ? '+' : ''}${z.toFixed(2)}σ`, date: data.UMCSENT?.[0]?.date, score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.UMCSENT, 24), tip: `z > 0 → green · −1σ to 0 → amber · < −1σ → red\nUniversity of Michigan Consumer Sentiment vs 10yr history.\nBridges hardship and recession signals — consumers feel hardship before it shows in data.`, weight: '10%', liveSource: 'FRED: UMCSENT' });
+    inds.push({ id: 106, name: 'Consumer Sentiment', sub: 'UMich Index (z-score)', sharedLabel: '(shared signal)', value: `${z >= 0 ? '+' : ''}${z.toFixed(2)}σ`, date: data.UMCSENT?.[0]?.date, freshnessDate: hardshipFreshnessDate('UMCSENT', data.UMCSENT?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.UMCSENT, 24), tip: `z > 0 → green · −1σ to 0 → amber · < −1σ → red\nUniversity of Michigan Consumer Sentiment vs 10yr history.\nBridges hardship and recession signals — consumers feel hardship before it shows in data.`, weight: '10%', liveSource: 'FRED: UMCSENT' });
   } catch (e) { inds.push(errorInd(106, 'Consumer Sentiment', 'UMich Index (z-score)', '10%')); }
   try {
     const current = getVal(data.LES1252881600Q);
     const yearAgo = data.LES1252881600Q?.[4]?.value ?? null;
     const yoy = current && yearAgo ? (current / yearAgo - 1) * 100 : null;
     const score = yoy !== null ? scoreLinear(yoy, -4, 4) : 50;
-    inds.push({ id: 107, name: 'Real Median Weekly Earnings YoY', sub: 'Purchasing Power of Typical Workers', value: yoy !== null ? `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}%` : '—', date: data.LES1252881600Q?.[0]?.date, freshnessDate: offsetDateStr(data.LES1252881600Q?.[0]?.date, 45), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.LES1252881600Q, 12), sparkLabel: '12 quarters (3yr)', tip: `YoY > 1% → green · −1–1% → amber · < −1% → red\nReal median weekly earnings of full-time workers.\nCaptures whether typical workers are gaining or losing purchasing power.`, weight: '9%', liveSource: 'FRED: LES1252881600Q' });
+    inds.push({ id: 107, name: 'Real Median Weekly Earnings YoY', sub: 'Purchasing Power of Typical Workers', value: yoy !== null ? `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}%` : '—', date: data.LES1252881600Q?.[0]?.date, freshnessDate: hardshipFreshnessDate('LES1252881600Q', data.LES1252881600Q?.[0]?.date), score: Math.round(score), signal: computeSignalColor(score), spark: getSparkValues(data.LES1252881600Q, 12), sparkLabel: '12 quarters (3yr)', tip: `YoY > 1% → green · −1–1% → amber · < −1% → red\nReal median weekly earnings of full-time workers.\nCaptures whether typical workers are gaining or losing purchasing power.`, weight: '9%', liveSource: 'FRED: LES1252881600Q' });
   } catch (e) { inds.push(errorInd(107, 'Real Median Weekly Earnings YoY', 'Purchasing Power of Typical Workers', '9%')); }
   return inds;
 }
