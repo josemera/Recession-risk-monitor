@@ -1264,6 +1264,18 @@ function hardshipLineColor(score) {
   return 'rgba(240,70,90,0.95)';
 }
 
+function recessionLineColor(score, alpha = 1) {
+  if (score >= 67) return `rgba(61,220,132,${alpha})`;
+  if (score >= 50) return `rgba(245,166,35,${alpha})`;
+  return `rgba(240,70,90,${alpha})`;
+}
+
+function hardshipLineColorWithAlpha(score, alpha = 1) {
+  if (score >= 67) return `rgba(61,220,132,${alpha})`;
+  if (score >= 34) return `rgba(224,92,92,${alpha})`;
+  return `rgba(240,70,90,${alpha})`;
+}
+
 function updateLegendState() {
   const map = {
     recession: 'legendRecession',
@@ -1302,6 +1314,7 @@ function setActiveContentSection(section) {
   document.getElementById('activeSectionHeader').textContent = recessionActive
     ? 'Recession Risk · Composite, Indicators & Signal Logic'
     : 'Economic Hardship · Composite, Indicators & Signal Logic';
+  renderChartOnly();
 }
 
 function showScoreInfo() {
@@ -1513,13 +1526,19 @@ function renderHistoryChart(recessionScore, usrec = [], recessionHistory = [], h
     ctx.stroke();
     ctx.setLineDash([]);
   }
+  const recessionActive = currentContentSection === 'recession';
+  const hardshipActive = currentContentSection === 'hardship';
   if (chartVisibility.recession) {
     for (let i = 1; i < N; i++) {
       const s0 = plotData[i - 1].recession, s1 = plotData[i].recession;
       const avg = (s0 + s1) / 2;
-      ctx.strokeStyle = avg < 50 ? 'rgba(240,70,90,0.9)' : avg < 70 ? 'rgba(245,166,35,0.9)' : 'rgba(61,220,132,0.9)';
-      ctx.lineWidth = 2;
+      const alpha = recessionActive ? 0.98 : 0.34;
+      ctx.strokeStyle = recessionLineColor(avg, alpha);
+      ctx.lineWidth = recessionActive ? 3 : 1.6;
+      ctx.shadowColor = recessionActive ? recessionLineColor(avg, 0.35) : 'transparent';
+      ctx.shadowBlur = recessionActive ? 10 : 0;
       ctx.beginPath(); ctx.moveTo(idxToX(i - 1), toY(s0)); ctx.lineTo(idxToX(i), toY(s1)); ctx.stroke();
+      ctx.shadowBlur = 0;
     }
   }
   if (HARDSHIP_ENABLED && chartVisibility.hardship) {
@@ -1527,22 +1546,27 @@ function renderHistoryChart(recessionScore, usrec = [], recessionHistory = [], h
       const h0 = plotData[i - 1].hardship;
       const h1 = plotData[i].hardship;
       if (h0 === null || h0 === undefined || h1 === null || h1 === undefined) continue;
-      ctx.strokeStyle = hardshipLineColor((h0 + h1) / 2);
-      ctx.lineWidth = 2;
+      const avg = (h0 + h1) / 2;
+      const alpha = hardshipActive ? 0.98 : 0.32;
+      ctx.strokeStyle = hardshipLineColorWithAlpha(avg, alpha);
+      ctx.lineWidth = hardshipActive ? 3 : 1.5;
+      ctx.shadowColor = hardshipActive ? hardshipLineColorWithAlpha(avg, 0.28) : 'transparent';
+      ctx.shadowBlur = hardshipActive ? 10 : 0;
       ctx.beginPath();
       ctx.moveTo(idxToX(i - 1), toY(h0));
       ctx.lineTo(idxToX(i), toY(h1));
       ctx.stroke();
+      ctx.shadowBlur = 0;
     }
   }
   const last = plotData[N - 1];
   if (chartVisibility.recession) {
-    ctx.fillStyle = recessionScore < 50 ? '#f0465a' : recessionScore < 70 ? '#f5a623' : '#3ddc84';
-    ctx.beginPath(); ctx.arc(idxToX(N - 1), toY(last.recession), 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = recessionLineColor(recessionScore, recessionActive ? 1 : 0.55);
+    ctx.beginPath(); ctx.arc(idxToX(N - 1), toY(last.recession), recessionActive ? 6 : 4, 0, Math.PI * 2); ctx.fill();
   }
   if (HARDSHIP_ENABLED && hardshipScore !== null && chartVisibility.hardship) {
-    ctx.fillStyle = hardshipLineColor(hardshipScore);
-    ctx.beginPath(); ctx.arc(idxToX(N - 1), toY(last.hardship), 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = hardshipLineColorWithAlpha(hardshipScore, hardshipActive ? 1 : 0.55);
+    ctx.beginPath(); ctx.arc(idxToX(N - 1), toY(last.hardship), hardshipActive ? 6 : 4, 0, Math.PI * 2); ctx.fill();
   }
   const yCanvas = document.getElementById('histYAxis');
   yCanvas.width = 36 * dpr; yCanvas.height = H * dpr; yCanvas.style.width = '36px'; yCanvas.style.height = H + 'px';
