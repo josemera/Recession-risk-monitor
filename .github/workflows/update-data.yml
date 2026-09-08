@@ -40,7 +40,18 @@ jobs:
           git add data/fred-data.json
           if git diff --staged --quiet; then
             echo "No data changes."
-          else
-            git commit -m "chore(data): refresh FRED snapshot"
-            git push
+            exit 0
           fi
+          git commit -m "chore(data): refresh FRED snapshot"
+          # A queued run checks out the SHA it was triggered at, so another
+          # run's snapshot may have landed since. Rebase and retry rather
+          # than failing the job.
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt) — rebasing onto origin/main."
+            git pull --rebase origin main
+          done
+          echo "Could not push the snapshot after 3 attempts."
+          exit 1
