@@ -219,6 +219,39 @@ Because the app is a single HTML file, it can be hosted on:
 
 No server runtime is required.
 
+### Daily data snapshot (GitHub Pages)
+
+Browsers cannot call the FRED API directly from a hosted page — FRED sends no
+CORS headers, and public CORS proxies are unreliable. Instead, a GitHub Action
+fetches the data server-side once a day and commits it as a static file the
+page reads same-origin.
+
+- `scripts/fetch-fred-data.mjs` — fetches every series the dashboard uses and
+  writes `data/fred-data.json`.
+- `.github/workflows/update-data.yml` — runs it daily at 11:10 UTC (plus
+  manually via *Run workflow*) and commits the file when it changes.
+- `index.html` loads `data/fred-data.json` first. If the file is missing (for
+  example when opening the file locally), it falls back to the original
+  API-key + CORS-proxy path, and then to demo data.
+
+**Setup, one time:**
+
+1. Repo → Settings → Secrets and variables → Actions → New repository secret,
+   named `FRED_API_KEY`, holding your FRED key.
+2. Repo → Settings → Actions → General → Workflow permissions → *Read and
+   write permissions*, so the job can push the refreshed snapshot.
+3. Actions → *Update FRED data* → *Run workflow* to generate the first
+   snapshot.
+
+To generate a snapshot locally instead:
+
+```bash
+FRED_API_KEY=your_key node scripts/fetch-fred-data.mjs
+```
+
+The series ids and observation limits in `scripts/fetch-fred-data.mjs` mirror
+`loadData()` and `loadHistory()` in `index.html` — change them together.
+
 ---
 
 ## Disclaimer

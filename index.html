@@ -493,7 +493,7 @@ body::before{
       </div>
       <div id="lastUpdated" style="font-size:9px;color:var(--text-muted)"></div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-ghost btn-sm" id="refreshBtn" onclick="loadData()" style="display:none">↻ Refresh</button>
+        <button class="btn btn-ghost btn-sm" id="refreshBtn" onclick="refreshData()" style="display:none">↻ Refresh</button>
         <button class="btn btn-ghost btn-sm" id="exportBtn" onclick="exportDashboard()" style="display:none">↓ Export PNG</button>
         <button class="btn btn-ghost btn-sm" onclick="resetKey()" id="resetKeyBtn" style="display:none">✕ Change Key</button>
       </div>
@@ -771,6 +771,52 @@ function loadDemo() {
 const IN_SANDBOX = (() => {
   try { return window.self !== window.top; } catch (e) { return true; }
 })();
+
+// ── STATIC DATA SNAPSHOT ────────────────────────────────────────────────
+// Primary data path on GitHub Pages. A daily GitHub Action
+// (.github/workflows/update-data.yml) calls FRED server-side and commits
+// data/fred-data.json, which the page then loads same-origin — no CORS
+// proxies, no API key in the browser.
+//
+// The live-FRED path below is kept as a fallback for local/file:// use and
+// for anyone who wants intraday data with their own key.
+const SNAPSHOT_URL = 'data/fred-data.json';
+let snapshotMode = false;
+
+async function loadFromSnapshot() {
+  setStatus('loading');
+  const res = await fetch(`${SNAPSHOT_URL}?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const snap = await res.json();
+  if (!snap || !snap.live || !Object.keys(snap.live).length) throw new Error('Snapshot is empty');
+
+  histScores = [];
+  hardshipScores = [];
+  liveData = snap.live;
+  liveData.DGS10_MON = dailyToMonthly(liveData.DGS10, 24);
+  liveData.TB3MS_MON = dailyToMonthly(liveData.TB3MS, 24);
+  histData = snap.hist || {};
+  histScores = reconstructHistory(histData);
+  if (HARDSHIP_ENABLED) {
+    hardshipLiveData = snap.hardshipLive || {};
+    hardshipHistData = snap.hardshipHist || {};
+    hardshipScores = reconstructHardshipHistory(hardshipHistData);
+  }
+  snapshotMode = true;
+  renderAll();
+  setStatus(snap.failed && snap.failed.length ? 'partial' : 'snapshot');
+  document.getElementById('lastUpdated').textContent = 'Updated: ' +
+    (snap.generatedAt ? new Date(snap.generatedAt).toLocaleString() : 'unknown');
+}
+
+// Refresh re-reads whichever source the page is currently using.
+function refreshData() {
+  if (snapshotMode) {
+    loadFromSnapshot().catch(e => setStatus('error', e.message));
+    return;
+  }
+  loadData();
+}
 
 // ── CORS PROXY LAYER ────────────────────────────────────────────────────
 // Browser-only. Required because direct FRED API calls are blocked by CORS
@@ -1413,6 +1459,7 @@ function setStatus(state, msg) {
   const txt = document.getElementById('statusText');
   dot.className = 'dot';
   if (state === 'live') { dot.classList.add('live'); txt.textContent = 'Live · FRED Data'; }
+  else if (state === 'snapshot') { dot.classList.add('live'); txt.textContent = 'FRED Data · Updated Daily'; }
   else if (state === 'partial') { dot.classList.add('live'); txt.textContent = 'Partial · Some series unavailable'; }
   else if (state === 'error') { dot.classList.add('error'); txt.textContent = 'Error: ' + (msg || 'Check API key'); }
   else if (state === 'demo') { txt.textContent = 'Demo Mode · Illustrative Data'; }
@@ -1846,13 +1893,22 @@ window.addEventListener('load', () => {
     renderDemo();
     return;
   }
-  if (apiKey) {
-    hideBanner();
-    loadData();
-  } else {
-    showBanner();
-    renderDemo();
-  }
+  loadFromSnapshot()
+    .then(() => {
+      hideBanner();
+      // No key is involved in snapshot mode, so hide the key controls.
+      document.getElementById('resetKeyBtn').style.display = 'none';
+    })
+    .catch(e => {
+      console.warn('No static snapshot available, falling back to FRED API:', e.message);
+      if (apiKey) {
+        hideBanner();
+        loadData();
+      } else {
+        showBanner();
+        renderDemo();
+      }
+    });
 });
 
 window.addEventListener('resize', () => {
