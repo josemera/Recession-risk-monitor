@@ -11,7 +11,7 @@
 // The four groups below mirror loadData()/loadHistory() in index.html.
 // Keep them in sync: same series ids, same limits, same key names.
 
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 const FRED_URL = 'https://api.stlouisfed.org/fred/series/observations';
 const API_KEY = process.env.FRED_API_KEY;
@@ -97,5 +97,6 @@ if (fetched < expected * 0.8) {
   process.exit(1);
 }
 
+await mkdir(new URL('../data/', import.meta.url), { recursive: true });
 await writeFile(OUT_PATH, JSON.stringify(snapshot) + '\n');
 console.log(`Wrote ${fetched}/${expected} series to data/fred-data.json`);
