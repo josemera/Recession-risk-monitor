@@ -804,7 +804,13 @@ async function loadFromSnapshot() {
   }
   snapshotMode = true;
   renderAll();
-  setStatus(snap.failed && snap.failed.length ? 'partial' : 'snapshot');
+  // A series FRED did not return is either carried over from the previous
+  // snapshot (stale) or absent entirely (partial). Report the difference.
+  const missing = (snap.failed || []).length;
+  const stale = (snap.stale || []).length;
+  if (missing) setStatus('partial');
+  else if (stale) setStatus('stale', `${stale} series ${stale === 1 ? 'is' : 'are'} showing previous values`);
+  else setStatus('snapshot');
   document.getElementById('lastUpdated').textContent = 'Updated: ' +
     (snap.generatedAt ? new Date(snap.generatedAt).toLocaleString() : 'unknown');
 }
@@ -1461,6 +1467,7 @@ function setStatus(state, msg) {
   if (state === 'live') { dot.classList.add('live'); txt.textContent = 'Live · FRED Data'; }
   else if (state === 'snapshot') { dot.classList.add('live'); txt.textContent = 'FRED Data · Updated Daily'; }
   else if (state === 'partial') { dot.classList.add('live'); txt.textContent = 'Partial · Some series unavailable'; }
+  else if (state === 'stale') { dot.classList.add('live'); txt.textContent = 'FRED Data · ' + (msg || 'Some series showing previous values'); }
   else if (state === 'error') { dot.classList.add('error'); txt.textContent = 'Error: ' + (msg || 'Check API key'); }
   else if (state === 'demo') { txt.textContent = 'Demo Mode · Illustrative Data'; }
   else { txt.textContent = 'Loading…'; }

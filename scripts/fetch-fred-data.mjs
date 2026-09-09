@@ -11,7 +11,7 @@
 // The four groups below mirror loadData()/loadHistory() in index.html.
 // Keep them in sync: same series ids, same limits, same key names.
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const FRED_URL = 'https://api.stlouisfed.org/fred/series/observations';
 const API_KEY = process.env.FRED_API_KEY;
@@ -72,7 +72,24 @@ async function fetchSeries(seriesId, limit, attempt = 1) {
   }
 }
 
-const snapshot = { generatedAt: new Date().toISOString(), failed: [] };
+// Previous snapshot, used to fill in any series FRED does not return this
+// run. A series that fails keeps yesterday's observations instead of
+// disappearing from the dashboard, and is reported as stale.
+let previous = null;
+try {
+  previous = JSON.parse(await readFile(OUT_PATH, 'utf8'));
+} catch (e) {
+  console.log('No previous snapshot to fall back on — this is a first run.');
+}
+
+const snapshot = { generatedAt: new Date().toISOString(), failed: [], stale: [] };
+
+// Preserve the date a series first went stale, so "stale since" reflects the
+// last time the value actually changed rather than the last run.
+function staleSince(group, seriesId) {
+  const prior = previous?.stale?.find(x => x.group === group && x.series === seriesId);
+  return prior?.since || previous?.generatedAt || null;
+}
 
 for (const [group, limits] of Object.entries(GROUPS)) {
   snapshot[group] = {};
@@ -82,21 +99,29 @@ for (const [group, limits] of Object.entries(GROUPS)) {
       snapshot[group][seriesId] = rows;
       console.log(`${group}/${seriesId}: ${rows.length} observations`);
     } catch (e) {
-      snapshot.failed.push(`${group}/${e.message}`);
-      console.warn(`FAILED ${group}/${seriesId}: ${e.message}`);
+      const carried = previous?.[group]?.[seriesId];
+      if (carried && carried.length) {
+        snapshot[group][seriesId] = carried;
+        snapshot.stale.push({ group, series: seriesId, since: staleSince(group, seriesId) });
+        console.warn(`STALE ${group}/${seriesId}: ${e.message} — kept ${carried.length} previous observations`);
+      } else {
+        snapshot.failed.push(`${group}/${seriesId}`);
+        console.warn(`FAILED ${group}/${seriesId}: ${e.message} — no previous data to fall back on`);
+      }
     }
   }
 }
 
-// A run that loses most of the data would publish a broken dashboard — treat
-// that as a failure and leave the previous snapshot in place.
-const fetched = Object.keys(GROUPS).reduce((n, g) => n + Object.keys(snapshot[g]).length, 0);
+// With the fallback in place this only trips on a first run, or if the
+// previous snapshot was itself broken. Better to keep the old file than to
+// publish a gutted dashboard.
+const present = Object.keys(GROUPS).reduce((n, g) => n + Object.keys(snapshot[g]).length, 0);
 const expected = Object.values(GROUPS).reduce((n, l) => n + Object.keys(l).length, 0);
-if (fetched < expected * 0.8) {
-  console.error(`Only ${fetched}/${expected} series fetched — refusing to write snapshot.`);
+if (present < expected * 0.8) {
+  console.error(`Only ${present}/${expected} series available — refusing to write snapshot.`);
   process.exit(1);
 }
 
 await mkdir(new URL('../data/', import.meta.url), { recursive: true });
 await writeFile(OUT_PATH, JSON.stringify(snapshot) + '\n');
-console.log(`Wrote ${fetched}/${expected} series to data/fred-data.json`);
+console.log(`Wrote ${present}/${expected} series (${snapshot.stale.length} stale, ${snapshot.failed.length} missing) to data/fred-data.json`);
